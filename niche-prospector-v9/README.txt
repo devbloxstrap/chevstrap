@@ -240,6 +240,15 @@ hai aur zaroorat ho to turant ek run ho jati hai. Token bhi save hona
 zaroori hai (step 1 mein "Remember token"), warna auto mode har baar
 token ka intezar kar ke skip karta rahega.
 
+STOP BUTTONS — Discover candidates, Verify + rank niches aur Auto mode
+teeno ke apne "■ Stop" button hain. Dabate hi chalu request turant chhorh
+di jati hai (rate-limit wait ke beech mein bhi) — poora interval ya poori
+list khatam hone ka intezar nahi karna parta. Discovery/Verify ko rok kar
+jo candidates ya results ab tak mil chuke the wo box/table mein maujood
+rehte hain, "Discover"/"Verify" dobara dabate hi wahin se aage barh jate
+hain. Auto mode ka Stop chalu cycle ko bhi turant rok deta hai, sirf agla
+scheduled run cancel nahi karta.
+
 
 -------------------------------------------------------------------
 TAJWEEZ KARDA WORKFLOW
