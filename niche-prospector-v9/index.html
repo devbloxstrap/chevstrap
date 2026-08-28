@@ -1,0 +1,2391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Niche Prospector V9 — GitHub niche discovery, clustering &amp; scoring</title>
+<style>
+  :root{
+    --ink:#0e1420;          /* deep ink base */
+    --ink-2:#151d2e;        /* panel */
+    --ink-3:#1d2740;        /* raised */
+    --line:#2a3550;         /* hairlines */
+    --text:#e8edf7;         /* primary text */
+    --muted:#8896b3;        /* secondary text */
+    --dim:#5c6b8a;          /* tertiary */
+    --gold:#e8b23a;         /* SIGNAL / niche found */
+    --gold-soft:#f0cd7a;
+    --ok:#5fb98a;           /* has-site (not a gap) */
+    --bad:#ec6a5e;          /* error */
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--ink);color:var(--text);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased}
+  body{padding:0 20px 80px}
+  .wrap{max-width:1380px;margin:0 auto}
+
+  /* ---- header ---- */
+  header{padding:38px 0 22px;border-bottom:1px solid var(--line);margin-bottom:26px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--gold);margin:0 0 12px}
+  h1{font-family:var(--mono);font-weight:600;font-size:30px;line-height:1.05;margin:0 0 10px;
+    letter-spacing:-.01em}
+  h1 .gly{color:var(--gold)}
+  .sub{color:var(--muted);max-width:60ch;font-size:14.5px;line-height:1.55;margin:0}
+
+  /* ---- panel ---- */
+  .panel{background:var(--ink-2);border:1px solid var(--line);border-radius:10px;
+    padding:20px;margin-bottom:18px}
+  .panel h2{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 14px;font-weight:600}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  input[type=password],input[type=text],textarea{
+    width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);
+    border-radius:7px;padding:11px 12px;font-family:var(--mono);font-size:13px;outline:none}
+  input:focus,textarea:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,178,58,.14)}
+  textarea{min-height:78px;resize:vertical;line-height:1.5}
+  .hint{font-size:11.5px;color:var(--dim);margin:6px 0 0;line-height:1.5}
+  .hint a{color:var(--gold-soft)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:680px){.row{grid-template-columns:1fr}}
+
+  /* ---- drop zone ---- */
+  .drop{border:1.5px dashed var(--line);border-radius:8px;padding:18px;text-align:center;
+    cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);font-size:13px}
+  .drop:hover,.drop.over{border-color:var(--gold);background:rgba(232,178,58,.05);color:var(--text)}
+  .drop b{color:var(--gold-soft)}
+  .filecount{font-family:var(--mono);font-size:12px;color:var(--gold);margin-top:8px}
+
+  .check{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;color:var(--muted)}
+  .check input{accent-color:var(--gold);width:15px;height:15px}
+
+  /* ---- buttons ---- */
+  .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:4px}
+  button{font-family:var(--sans);font-size:14px;font-weight:600;border-radius:7px;
+    border:1px solid transparent;padding:11px 20px;cursor:pointer;transition:transform .08s,background .15s}
+  button:active{transform:translateY(1px)}
+  .go{background:var(--gold);color:#221800;border-color:var(--gold)}
+  .go:hover{background:var(--gold-soft)}
+  .go:disabled{opacity:.5;cursor:not-allowed}
+  .ghost{background:transparent;color:var(--text);border-color:var(--line)}
+  .ghost:hover{border-color:var(--gold);color:var(--gold-soft)}
+
+  /* ---- status ---- */
+  .status{display:none;align-items:center;gap:14px;margin-top:16px;font-family:var(--mono);
+    font-size:12.5px;color:var(--muted)}
+  .status.show{display:flex}
+  .bar{flex:1;height:6px;background:var(--ink-3);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:var(--gold);transition:width .25s}
+  .ratelimit{color:var(--dim)}
+
+  /* ---- results ---- */
+  .toolbar{display:none;justify-content:space-between;align-items:center;gap:12px;
+    flex-wrap:wrap;margin:26px 0 12px}
+  .toolbar.show{display:flex}
+  .tstat{font-family:var(--mono);font-size:12.5px;color:var(--muted)}
+  .tstat b{color:var(--gold)}
+  .toolbar .right{display:flex;gap:10px;align-items:center}
+  .seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .seg button{border:0;border-radius:0;background:var(--ink-2);color:var(--muted);
+    padding:8px 13px;font-size:12.5px}
+  .seg button.on{background:var(--gold);color:#221800}
+
+  .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{width:100%;border-collapse:collapse;display:none;min-width:1312px;table-layout:fixed}
+  table.show{display:table}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--dim);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);
+    cursor:pointer;user-select:none;white-space:nowrap;position:relative;overflow:hidden;
+    text-overflow:ellipsis}
+  th:hover{color:var(--gold)}
+  th.num,td.num{text-align:right}
+  td{padding:12px;border-bottom:1px solid rgba(42,53,80,.5);font-size:13.5px;vertical-align:middle;
+    overflow:hidden}
+  td.repo{font-family:var(--mono);font-size:12.5px}
+  td.repo a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line);
+    display:inline-block;max-width:calc(100% - 44px);overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;vertical-align:bottom}
+  td.repo a:hover{color:var(--gold-soft);border-color:var(--gold)}
+  td.num{font-family:var(--mono);white-space:nowrap}
+
+  /* ---- drag-to-resize columns ---- */
+  th .rsz{position:absolute;top:0;right:-4px;width:9px;height:100%;cursor:col-resize;z-index:5;
+    touch-action:none}
+  th .rsz::after{content:"";position:absolute;top:22%;bottom:22%;left:4px;width:1px;
+    background:transparent;transition:background .12s}
+  th:hover .rsz::after{background:var(--line)}
+  th .rsz:hover::after,th .rsz.on::after{background:var(--gold);top:0;bottom:0;width:2px}
+  th.sp,td.sp{padding:0;cursor:default;width:auto}
+  th.sp:hover{color:var(--dim)}
+  body.resizing{cursor:col-resize;user-select:none}
+  body.resizing .tablewrap{overflow-x:hidden}
+  tr.gap{background:linear-gradient(90deg,rgba(232,178,58,.09),transparent 55%)}
+  tr.gap td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+  .tag{font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:3px 7px;border-radius:5px;
+    white-space:nowrap}
+  .tag.niche{background:rgba(232,178,58,.16);color:var(--gold-soft)}
+  .tag.site{background:rgba(95,185,138,.14);color:var(--ok)}
+  .tag.err{background:rgba(236,106,94,.16);color:var(--bad)}
+  /* latest-release cell bits */
+  .share{color:var(--dim);font-size:10.5px;font-family:var(--mono);margin-left:5px}
+  .relline{white-space:nowrap}
+  .reltag{margin-top:3px;font-family:var(--mono);font-size:11px;color:var(--dim);
+    max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reltag a{color:var(--dim);text-decoration:none;border-bottom:1px solid transparent}
+  .reltag a:hover{color:var(--gold-soft);border-color:var(--gold)}
+  .prov{color:var(--gold-soft);border-bottom:1px dotted rgba(232,178,58,.45);cursor:help}
+  .tip{border-bottom:1px dotted var(--line);cursor:help}
+  .pre{color:var(--gold-soft);font-size:9.5px;letter-spacing:.08em;border:1px solid rgba(232,178,58,.35);
+    border-radius:4px;padding:1px 4px;margin-left:4px}
+  /* signal meter */
+  .meter{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .meter .track{flex:0 1 64px;min-width:16px;height:6px;background:var(--ink-3);border-radius:99px;overflow:hidden}
+  .meter .track > i{display:block;height:100%;background:var(--gold)}
+  .meter .val{font-family:var(--mono);font-size:12px;color:var(--muted);min-width:42px;text-align:right;flex:none}
+
+  /* change vs last saved scan */
+  .delta{font-family:var(--mono);font-size:10.5px;margin-left:6px;padding:1px 5px;border-radius:4px;
+    white-space:nowrap;cursor:help}
+  .delta.up{background:rgba(232,178,58,.16);color:var(--gold-soft)}
+  .delta.down{background:rgba(136,150,179,.14);color:var(--muted)}
+
+  /* restored-session banner */
+  .banner{display:none;align-items:center;gap:12px;flex-wrap:wrap;
+    background:rgba(232,178,58,.07);border:1px solid rgba(232,178,58,.30);border-radius:9px;
+    padding:11px 14px;margin-bottom:18px;font-family:var(--mono);font-size:12.5px;color:var(--gold-soft)}
+  .banner.show{display:flex}
+  .banner .sp{flex:1}
+  .banner button{padding:6px 12px;font-size:12px;font-family:var(--mono)}
+
+  .empty{color:var(--dim);font-size:13px;padding:30px 4px;text-align:center;font-family:var(--mono);display:none}
+  .empty.show{display:block}
+  footer{margin-top:40px;color:var(--dim);font-size:11.5px;line-height:1.6;font-family:var(--mono)}
+
+  /* ---- V6 discovery / scoring ---- */
+  .discovergrid{display:grid;grid-template-columns:1.4fr .6fr;gap:16px}
+  @media(max-width:760px){.discovergrid{grid-template-columns:1fr}}
+  .minirow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:680px){.minirow{grid-template-columns:1fr}}
+  input[type=number],select{width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px 11px;font-family:var(--mono);font-size:12.5px;outline:none}
+  input[type=number]:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(232,178,58,.14)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+  .chip{font-family:var(--mono);font-size:10.5px;border:1px solid var(--line);background:var(--ink);color:var(--muted);border-radius:99px;padding:5px 9px;cursor:pointer}
+  .chip:hover{border-color:var(--gold);color:var(--gold-soft)}
+  .score{display:inline-flex;align-items:center;justify-content:center;min-width:42px;height:27px;border-radius:7px;font:700 12px var(--mono);border:1px solid var(--line)}
+  .score.hot{background:rgba(232,178,58,.17);border-color:rgba(232,178,58,.45);color:var(--gold-soft)}
+  .score.good{background:rgba(95,185,138,.13);border-color:rgba(95,185,138,.35);color:var(--ok)}
+  .score.mid{color:var(--muted)}
+  .intent-high{color:var(--gold-soft)} .intent-medium{color:var(--ok)} .intent-low{color:var(--dim)}
+  .subcell{font:10.5px var(--mono);color:var(--dim);margin-top:3px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .site-none{color:var(--gold-soft)} .site-docs{color:var(--gold-soft)} .site-readme{color:var(--muted)} .site-dedicated{color:var(--ok)}
+  .kwbtn{padding:4px 7px!important;font:10px var(--mono)!important;margin-left:6px}
+
+  /* ---- column show / hide ---- */
+  .colwrap{position:relative}
+  #colbtn{white-space:nowrap}
+  #colbtn .cnt{font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:7px}
+  #colbtn.open{border-color:var(--gold);color:var(--gold-soft)}
+  #colbtn.open .cnt{color:var(--gold-soft)}
+  .colmenu{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:40;width:252px;
+    background:var(--ink-2);border:1px solid var(--line);border-radius:9px;padding:10px;
+    box-shadow:0 16px 38px rgba(0,0,0,.5)}
+  .colmenu.show{display:block}
+  .colmenu .chead{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:2px 4px 9px;border-bottom:1px solid var(--line);margin-bottom:6px}
+  .colmenu .chead > span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--dim)}
+  .colmenu .pset{display:flex;gap:6px}
+  .colmenu .pset button{background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:5px;padding:3px 8px;font:600 10.5px var(--mono)}
+  .colmenu .pset button:hover{border-color:var(--gold);color:var(--gold-soft)}
+  .collist{max-height:296px;overflow-y:auto}
+  .colitem{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:6px;
+    font-size:12.5px;color:var(--text);cursor:pointer;user-select:none}
+  .colitem:hover{background:var(--ink-3)}
+  .colitem.off{color:var(--dim)}
+  .colitem input{accent-color:var(--gold);width:14px;height:14px;cursor:pointer;flex:none}
+  .colmenu .cfoot{border-top:1px solid var(--line);margin-top:7px;padding:8px 4px 2px}
+  .colmenu .cfoot button{background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:5px;padding:4px 9px;font:600 10.5px var(--mono);width:100%}
+  .colmenu .cfoot button:hover{border-color:var(--gold);color:var(--gold-soft)}
+  .colmenu .cfoot span{display:block;margin-top:7px;text-align:center;font:10px var(--mono);color:var(--dim)}
+  @media(max-width:680px){.colmenu{width:min(252px,calc(100vw - 48px))}}
+
+  /* ---- V9: tabs ---- */
+  .tabs{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .tabs button{border:0;border-radius:0;background:var(--ink-2);color:var(--muted);
+    padding:8px 15px;font-size:12.5px;white-space:nowrap}
+  .tabs button.on{background:var(--gold);color:#221800}
+
+  /* ---- V9: niche table ---- */
+  #ntbl{width:100%;border-collapse:collapse;display:none;min-width:1060px}
+  #ntbl.show{display:table}
+  #ntbl td{vertical-align:top}
+  #ntbl th{white-space:nowrap}
+  .nname{font-family:var(--mono);font-size:13.5px;color:var(--gold-soft);word-break:break-word}
+  .nsub{font:10.5px var(--mono);color:var(--dim);margin-top:4px;line-height:1.5}
+  .nbar{height:5px;background:var(--ink-3);border-radius:99px;overflow:hidden;margin-top:6px;width:100%}
+  .nbar > i{display:block;height:100%;background:var(--gold)}
+  .kwbox{font:11px var(--mono);color:var(--muted);line-height:1.7;white-space:pre-line;
+    max-width:240px}
+  .nlead{font:11.5px var(--mono);color:var(--text)}
+  .nlead a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line)}
+  .nlead a:hover{color:var(--gold-soft);border-color:var(--gold)}
+  .warn{color:var(--bad)}
+
+  /* ---- V9: score weight sliders ---- */
+  .wgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:820px){.wgrid{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){.wgrid{grid-template-columns:1fr}}
+  .wrow label{display:flex;justify-content:space-between;align-items:baseline;
+    font:11px var(--mono);color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+  .wrow label b{color:var(--gold-soft);font-size:12px}
+  .wrow .wnote{font:10.5px var(--mono);color:var(--dim);margin-top:3px}
+  input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0 0;height:18px}
+  .presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
+  .presets button{background:transparent;border:1px solid var(--line);color:var(--muted);
+    border-radius:99px;padding:5px 12px;font:600 11px var(--mono)}
+  .presets button:hover{border-color:var(--gold);color:var(--gold-soft)}
+
+  /* ---- V9: budget + cache readouts ---- */
+  .budget{font:11.5px var(--mono);color:var(--dim);margin-top:12px;line-height:1.6}
+  .budget b{color:var(--gold-soft)}
+  .cacheline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;
+    font:11.5px var(--mono);color:var(--dim)}
+  .cacheline b{color:var(--ok)}
+  .cacheline button{padding:5px 11px;font:600 11px var(--mono)}
+
+  @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">discovery · verification · ranking</p>
+    <h1>Niche Prospector V9 <span class="gly">◆</span></h1>
+    <p class="sub">Discover GitHub products automatically, verify real release downloads, detect consumer install intent and website gaps, rank every candidate 0–100 — then roll the whole table up into <b>niches</b>: where demand is real, competition is thin and nobody owns the search results yet.</p>
+  </header>
+
+  <!-- restored / imported session notice -->
+  <div class="banner" id="banner">
+    <span id="bannertxt"></span>
+    <span class="sp"></span>
+    <button class="ghost" id="forget">Clear saved data</button>
+  </div>
+
+  <!-- STEP 1: token -->
+  <div class="panel">
+    <h2>1 · Access token</h2>
+    <label for="tok">Personal access token — public data only, no scopes needed</label>
+    <input id="tok" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+    <p class="hint">Make one at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → “Generate new token (classic)” → tick nothing → Generate. The token stays in this browser and is sent only to api.github.com.</p>
+    <label class="check"><input type="checkbox" id="remember"> Remember token on this device</label>
+  </div>
+
+  <!-- STEP 2: discovery -->
+  <div class="panel" id="discoveryPanel">
+    <h2>2 · Auto discovery <span class="badge">V8 RESUME</span></h2>
+    <div class="discovergrid">
+      <div>
+        <label for="seeds">Discovery seeds — one search theme per line</label>
+        <textarea id="seeds" placeholder="windows utility
+macos app
+downloader
+launcher
+converter
+screen recorder">windows utility
+macos app
+downloader
+launcher
+converter
+screen recorder
+file manager
+pdf tool
+android utility
+desktop app</textarea>
+        <div class="chips">
+          <button class="chip" data-seed="windows utility">+ Windows</button>
+          <button class="chip" data-seed="macos app">+ macOS</button>
+          <button class="chip" data-seed="game launcher">+ Launchers</button>
+          <button class="chip" data-seed="media downloader">+ Downloaders</button>
+          <button class="chip" data-seed="productivity app">+ Productivity</button>
+          <button class="chip" data-seed="desktop customization">+ Customization</button>
+        </div>
+      </div>
+      <div>
+        <div class="minirow">
+          <div><label for="minstars">Min stars</label><input id="minstars" type="number" min="0" value="300"></div>
+          <div><label for="updateddays">Updated within days</label><input id="updateddays" type="number" min="1" value="365"></div>
+          <div><label for="perseed">Repos / seed</label><input id="perseed" type="number" min="5" max="100" value="20"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="consumerwords" checked> Bias toward user-facing apps (app/tool/client/gui/desktop etc.)</label>
+        <label class="check"><input type="checkbox" id="topicexpand" checked> Auto Topic Expansion — turn recurring repo topics into new searches</label>
+        <label class="check"><input type="checkbox" id="risingmode" checked> Rising Repo Discovery — prioritize young repos with fast star growth</label>
+        <label class="check"><input type="checkbox" id="gapmode" checked> Website Gap Hunter — boost repos with no dedicated homepage</label>
+        <label class="check"><input type="checkbox" id="unknownmode" checked> Unknown Category Hunter — preserve unusual consumer apps instead of burying “Other”</label>
+        <div class="minirow" style="margin-top:10px">
+          <div><label for="expandtopics">Expansion topics</label><input id="expandtopics" type="number" min="3" max="30" value="12"></div>
+          <div><label for="risingdays">Rising age days</label><input id="risingdays" type="number" min="30" max="730" value="365"></div>
+          <div><label for="maxdiscover">Max candidates</label><input id="maxdiscover" type="number" min="20" max="1000" value="300"></div>
+        </div>
+        <div class="minirow" style="margin-top:10px">
+          <div><label for="pagesper">Pages / query</label><input id="pagesper" type="number" min="1" max="10" value="3"></div>
+          <div><label for="concur">Verify threads</label><input id="concur" type="number" min="1" max="6" value="3"></div>
+          <div><label for="maxrelpages">Release pages max</label><input id="maxrelpages" type="number" min="1" max="10" value="3"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="starbands" checked> Star Banding — har search ko star tiers mein torhta hai, taake chhote repos bade repos ke neeche na dabein</label>
+        <label class="check"><input type="checkbox" id="readmesearch"> Search README text too — wider net, thora noisy</label>
+        <label class="check"><input type="checkbox" id="skipseen" checked> Skip repos already scanned — har run naye candidates deta hai</label>
+        <div class="actions" style="margin-top:14px">
+          <button class="go" id="discover">Discover candidates</button>
+          <button class="ghost" id="cleardiscovery">Clear list</button>
+          <button class="ghost" id="resetseen">Reset seen list</button>
+        </div>
+        <div class="budget" id="budget"></div>
+        <p class="hint">V9 chains Seed → Star tiers → Pages → Topics → New searches → Rising projects → Website gaps. Rate limit khatam ho to auto-pause + countdown + exact same request retry, aur browser checkpoint se refresh ke baad wahin se resume.</p><div id="clusters" class="hint" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="status" id="discoverstatus">
+      <span id="discoverstatustxt">Discovering…</span>
+      <span class="bar"><i id="discoverbar"></i></span>
+      <span class="ratelimit" id="searchrl"></span>
+    </div>
+  </div>
+
+  <!-- STEP 3: repos -->
+  <div class="panel">
+    <h2>3 · Verify repositories</h2>
+    <div class="row">
+      <div>
+        <label>Upload CSV — one GitHub URL or <span style="font-family:var(--mono)">owner/repo</span> per line</label>
+        <div class="drop" id="drop">
+          Drop a <b>.csv</b> here, or click to choose
+          <div style="font-size:11.5px;color:var(--dim);margin-top:6px">a saved <b>.json</b> scan works here too</div>
+          <div class="filecount" id="filecount"></div>
+        </div>
+        <input type="file" id="file" accept=".csv,.txt,.json" hidden>
+      </div>
+      <div>
+        <label for="paste">…or paste them directly</label>
+        <textarea id="paste" placeholder="https://github.com/Genymobile/scrcpy
+yt-dlp/yt-dlp
+BtbN/FFmpeg-Builds"></textarea>
+        <p class="hint">Header rows and blank lines are ignored. Both full URLs and owner/repo work.</p>
+      </div>
+    </div>
+    <div class="actions" style="margin-top:16px">
+      <button class="go" id="scan">Verify + rank niches</button>
+      <button class="ghost" id="sample">Load sample list</button>
+      <button class="ghost" id="import">↑ Import saved scan</button>
+      <input type="file" id="importfile" accept=".json,.csv,.txt" hidden>
+    </div>
+    <div class="status" id="status">
+      <span id="statustxt">Scanning…</span>
+      <span class="bar"><i id="barfill"></i></span>
+      <span class="ratelimit" id="rl"></span>
+    </div>
+  </div>
+
+  <!-- STEP 4: scoring -->
+  <div class="panel">
+    <h2>4 · Score weights <span class="badge">V9 TUNABLE</span></h2>
+    <p class="hint" style="margin:-6px 0 14px">Score hamesha 0–100 rehta hai — sliders sirf ye tay karte hain ke <i>aap ke liye</i> "niche" ka matlab kya hai. Badalte hi table dobara score ho jata hai, koi re-scan nahi.</p>
+    <div class="wgrid" id="weights">
+      <div class="wrow" data-w="demand"><label>Demand <b>25</b></label><input type="range" min="0" max="40" value="25"><div class="wnote">downloads per month, abhi ka rate</div></div>
+      <div class="wrow" data-w="growth"><label>Growth <b>20</b></label><input type="range" min="0" max="40" value="20"><div class="wnote">momentum + star velocity</div></div>
+      <div class="wrow" data-w="gap"><label>Website gap <b>20</b></label><input type="range" min="0" max="40" value="20"><div class="wnote">koi dedicated site nahi = mauqa</div></div>
+      <div class="wrow" data-w="intent"><label>Consumer intent <b>15</b></label><input type="range" min="0" max="40" value="15"><div class="wnote">.exe/.dmg/.apk vs .dll/.whl</div></div>
+      <div class="wrow" data-w="fresh"><label>Freshness <b>10</b></label><input type="range" min="0" max="40" value="10"><div class="wnote">release + push activity</div></div>
+      <div class="wrow" data-w="ratio"><label>DL / star <b>10</b></label><input type="range" min="0" max="40" value="10"><div class="wnote">users &gt; developers</div></div>
+      <div class="wrow" data-w="unmet"><label>Unmet demand <b>0</b></label><input type="range" min="0" max="40" value="0"><div class="wnote">open issues ÷ stars — feature gaps</div></div>
+    </div>
+    <div class="presets">
+      <button type="button" data-p="default">Default</button>
+      <button type="button" data-p="seo">SEO / content hunter</button>
+      <button type="button" data-p="product">Product clone hunter</button>
+      <button type="button" data-p="rising">Early / rising only</button>
+    </div>
+    <div class="cacheline">
+      <span>HTTP cache (ETag → GitHub 304s aap ke rate limit se nahi kaate):</span>
+      <span id="cachestat">—</span>
+      <label style="display:inline-flex;align-items:center;gap:6px;margin:0;color:var(--dim)">reuse under
+        <input id="cachehours" type="number" min="0" max="720" value="0" style="width:72px;padding:4px 7px"> hrs</label>
+      <button class="ghost" id="clearcache">Clear cache</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: auto discovery mode -->
+  <div class="panel" id="autoPanel">
+    <h2>5 · Auto mode <span class="badge">SELF-RUNNING</span></h2>
+    <p class="hint" style="margin:-6px 0 14px">On rehte hue ye app khud discovery repeat karti hai — koi click zaroori nahi. Har cycle ke baad naye emerging topics khud seed list mein jur jate hain, taake agli baar app usi jagah nahi ruke jahan pehle ruki thi, balke aage naye niches ki taraf barhe. <b>Sirf tab khula rehna chahiye</b> — browser band ho ya laptop so jaye to timer bhi ruk jata hai; wapas khulte hi jo waqt guzar chuka hai wo hisaab mein aa jata hai aur zaroorat ho to turant ek run ho jati hai.</p>
+    <label class="check"><input type="checkbox" id="autoEnabled"> Auto mode ON — khud discover (+ verify) karta rahe</label>
+    <div class="minirow" style="margin-top:10px">
+      <div><label for="autoInterval">Har kitne ghante mein</label><input id="autoInterval" type="number" min="1" max="168" value="6"></div>
+      <div><label for="autoExpandN">Naye seeds / cycle</label><input id="autoExpandN" type="number" min="0" max="10" value="3"></div>
+      <div></div>
+    </div>
+    <label class="check"><input type="checkbox" id="autoVerifyChk" checked> Discovery ke turant baad Verify + rank bhi khud chala dein</label>
+    <label class="check"><input type="checkbox" id="autoExpandChk" checked> Emerging topic clusters ko khud seed list mein add karein (self-expanding — hamesha wahi seeds na dhoondta rahe)</label>
+    <div class="budget" id="autoStatus">Auto mode off.</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="toolbar" id="toolbar">
+    <div class="tstat" id="tstat"></div>
+    <div class="right">
+      <div class="tabs" id="tabs">
+        <button data-t="repos" class="on">Repos</button>
+        <button data-t="niches">Niches ◆</button>
+      </div>
+      <div class="seg" id="filter">
+        <button data-f="all" class="on">All</button>
+        <button data-f="gaps">Site gaps ◆</button>
+        <button data-f="consumer">Consumer</button>
+        <button data-f="hot">Score 70+</button>
+        <button data-f="trending">Trending</button>
+      </div>
+      <div class="colwrap">
+        <button class="ghost" id="colbtn" aria-haspopup="true" aria-expanded="false">▦ Columns<span class="cnt" id="colcount"></span></button>
+        <div class="colmenu" id="colmenu">
+          <div class="chead">
+            <span>Show columns</span>
+            <span class="pset">
+              <button type="button" data-preset="all">All</button>
+              <button type="button" data-preset="compact">Compact</button>
+            </span>
+          </div>
+          <div class="collist" id="collist"></div>
+          <div class="cfoot">
+            <button type="button" data-preset="widths">↔ Reset widths</button>
+            <span>drag header edges to resize</span>
+          </div>
+        </div>
+      </div>
+      <button class="ghost" id="export">Export CSV</button>
+      <button class="ghost" id="exportniches">Export niches</button>
+      <button class="ghost" id="save">↓ Save scan (.json)</button>
+    </div>
+  </div>
+
+  <div class="tablewrap" id="rwrap">
+  <table id="tbl">
+    <thead>
+      <tr>
+        <th data-k="score" class="num">Score</th>
+        <th data-k="repo">Repository</th>
+        <th data-k="category">Type</th>
+        <th data-k="platform">Platform</th>
+        <th data-k="consumerIntent">Intent</th>
+        <th data-k="stars" class="num">Stars</th>
+        <th data-k="downloads" class="num">Total DL</th>
+        <th data-k="latestDl" class="num">Latest DL</th>
+        <th data-k="ratio" class="num">DL / star</th>
+        <th data-k="perMonth" class="num">DL / month</th>
+        <th data-k="momentum" class="num">Momentum</th>
+        <th data-k="lastRelease">Latest release</th>
+        <th data-k="siteLevel">Web presence</th>
+        <th class="sp" aria-hidden="true"></th>
+      </tr>
+    </thead>
+    <tbody id="body"></tbody>
+  </table>
+  </div>
+
+  <!-- V9: niche rollup -->
+  <div class="tablewrap" id="nwrap" style="display:none">
+  <table id="ntbl">
+    <thead>
+      <tr>
+        <th data-nk="score" class="num">Niche score</th>
+        <th data-nk="niche">Niche</th>
+        <th data-nk="count" class="num">Repos</th>
+        <th data-nk="mo" class="num">DL / month</th>
+        <th data-nk="gapPct" class="num">No-site</th>
+        <th data-nk="intentPct" class="num">Consumer</th>
+        <th data-nk="growth" class="num">Growth</th>
+        <th data-nk="conc" class="num">Leader share</th>
+        <th data-nk="leader">Leader &amp; gap repos</th>
+        <th>Content angles</th>
+      </tr>
+    </thead>
+    <tbody id="nbody"></tbody>
+  </table>
+  </div>
+  <div class="empty" id="nempty">Niches tab ko bharne ke liye pehle kuch repos verify karein — kam az kam 2 repos ek topic share karein tab wo niche banti hai.</div>
+
+  <div class="empty" id="empty">No rows yet. Add repositories above and hit Scan downloads.</div>
+
+  <footer>
+    V9 workflow: <b>DISCOVER → AUTO-PAUSE/RESUME → VERIFY → RANK → CLUSTER INTO NICHES</b>. Auto discovery uses GitHub repository search, split across star tiers and pages; verification then sums release assets and inspects install-file signals.<br>
+    “Opportunity Score” is 0–100 and weighted by the sliders in step 4 (Demand, Growth, Website Gap, Consumer Intent, Freshness, DL/Star, Unmet demand). It is a prioritization score, not a promise of Google traffic.<br>
+    “Niche score” rolls repos up by shared topic: Demand 30 + Site gap 22 + Consumer intent 18 + Growth 14 + Fragmentation 10 + Unmet demand 6. <b>Fragmentation</b> matters — a topic where one project owns 95% of all downloads is a monopoly and a bad entry point; a topic where demand is spread across five mid-size projects is an open field. Only topics with 2+ verified repos become niches.<br>
+    Every GitHub response is stored with its ETag. On a re-scan the app revalidates instead of re-downloading, and GitHub does not charge a 304 against your rate limit — so scanning the same list again is close to free.<br>
+    “Total DL” = every asset across every release, summed live from the GitHub API.<br>
+    “Latest DL” = downloads of the newest release only, with its share of the all-time total beside it. A high share means demand is live right now, not a leftover from an old version. The date column shows when that release shipped and its tag — click the tag to open it on GitHub.<br>
+    “DL / month” is the current rate: latest-release downloads ÷ days that release has been out. It tracks demand today rather than a lifetime average — hover any number to see both. A “~” means the release is under 10 days old, so launch-day traffic is still inflating it. GitHub exposes no real download history, so treat every rate as a ballpark; for an exact figure, scan again in 30 days and subtract.<br>
+    “Web presence” checks the repo homepage plus README links: NONE = strongest site gap; DOCS = docs/GitHub only; README = an external domain appears only in README; DEDICATED = a real homepage is set.<br>
+    Every scan is saved in this browser automatically and reloads when you come back — no re-scan, no network. “Save scan (.json)” writes a portable copy you can keep or move to another machine; “Import saved scan” reads it back, along with any CSV this app exported. Re-scan an imported list and each row shows what changed since that snapshot. Your token is never saved to a file or exported.<br>
+    Runs entirely in your browser. Nothing is uploaded anywhere except your own calls to api.github.com.
+  </footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const tokEl=$('#tok'), rememberEl=$('#remember');
+
+// ---- remember token (local only) ----
+try{
+  const saved = localStorage.getItem('np_token');
+  if(saved){ tokEl.value=saved; rememberEl.checked=true; }
+}catch(e){}
+rememberEl.addEventListener('change',()=>{ if(!rememberEl.checked){ try{localStorage.removeItem('np_token')}catch(e){} }});
+
+// ---- CSV / file handling ----
+const drop=$('#drop'), fileInput=$('#file'), filecount=$('#filecount'), pasteEl=$('#paste');
+drop.addEventListener('click',()=>fileInput.click());
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f) readFile(f);});
+fileInput.addEventListener('change',e=>{const f=e.target.files[0]; if(f) readFile(f);});
+function readFile(f){
+  const r=new FileReader();
+  r.onload=()=>{
+    const t=String(r.result||'');
+    // agar ye app ka save kia hua scan hai to seedha import kar dein, warna repo list samjhein
+    if(looksLikeSavedScan(t)){ handleImportText(t,f.name); return; }
+    pasteEl.value=t; filecount.textContent='Loaded: '+f.name;
+  };
+  r.readAsText(f);
+}
+function looksLikeSavedScan(t){
+  const s=String(t||'').trim();
+  if(!s) return false;
+  if(s[0]==='{'||s[0]==='[') return true;
+  return /total_downloads/i.test(s.split(/\r?\n/)[0]||'');
+}
+
+$('#sample').addEventListener('click',()=>{
+  pasteEl.value=[
+    "https://github.com/Genymobile/scrcpy",
+    "yt-dlp/yt-dlp",
+    "BtbN/FFmpeg-Builds",
+    "mikf/gallery-dl",
+    "Raphire/Win11Debloat",
+    "ChrisTitusTech/winutil",
+    "Purfview/whisper-standalone-win",
+    "Stirling-Tools/Stirling-PDF",
+    "upscayl/upscayl",
+    "flameshot-org/flameshot",
+    "localsend/localsend"
+  ].join("\n");
+  filecount.textContent='Sample list loaded';
+});
+
+// parse repos from CSV/paste: accept URL or owner/repo, ignore header + blanks
+function parseRepos(text){
+  const out=[], seen=new Set();
+  text.split(/[\r\n]+/).forEach(line=>{
+    // take the first comma-separated cell that looks like a repo
+    line.split(',').forEach(cell=>{
+      let s=cell.trim().replace(/^"|"$/g,'');
+      if(!s) return;
+      let m=s.match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/i);
+      if(m){ add(m[1],m[2]); return; }
+      m=s.match(/^([\w.-]+)\/([\w.-]+)$/);
+      if(m && !/^https?:/i.test(s)){ add(m[1],m[2]); }
+    });
+  });
+  function add(o,r){ r=r.replace(/\.git$/i,''); const k=(o+'/'+r).toLowerCase();
+    if(o.toLowerCase()==='url'||o.toLowerCase()==='owner') return;
+    if(!seen.has(k)){ seen.add(k); out.push(o+'/'+r); } }
+  return out;
+}
+
+// =====================================================================
+//  V9 AUTO DISCOVERY
+//  V8 har seed par sirf EK page laata tha (max 100 repos). GitHub har query
+//  par 1000 results deta hai, aur har star-band ka apna 1000 ka ceiling hai.
+//  V9 = seeds x star bands x pages, plus "seen" list taake har run naya ho.
+// =====================================================================
+const seedsEl=$('#seeds');
+const SEEN_KEY='np_seen_v1';
+
+// ye topics itne aam hain ke inse koi niche nahi banti — search aur clustering dono se bahar
+const TOPIC_STOP=new Set(['github','github-api','open-source','opensource','oss','hacktoberfest',
+ 'hacktoberfest-accepted','good-first-issue','help-wanted','awesome','awesome-list','list',
+ 'javascript','typescript','js','ts','python','python3','rust','golang','go','java','kotlin','swift',
+ 'c','cpp','c-plus-plus','csharp','dotnet','php','ruby','shell','bash','powershell','html','css',
+ 'electron','tauri','react','reactjs','vue','vuejs','svelte','angular','nodejs','node','flutter','dart',
+ 'qt','gtk','wpf','winui','dotnet-core','maui','xamarin',
+ 'windows','windows10','windows11','macos','osx','linux','ubuntu','debian','android','ios','cross-platform',
+ 'app','apps','tool','tools','utility','utilities','software','free','opensource-app','gui','cli','desktop',
+ 'library','framework','sdk','api','package','module','plugin','extension','boilerplate','template','starter']);
+
+document.querySelectorAll('.chip[data-seed]').forEach(b=>b.addEventListener('click',()=>{
+  const cur=seedsEl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!cur.includes(b.dataset.seed)) cur.push(b.dataset.seed);
+  seedsEl.value=cur.join('\n'); estimateBudget();
+}));
+$('#cleardiscovery').addEventListener('click',()=>{ pasteEl.value=''; filecount.textContent=''; });
+
+function loadSeen(){
+  try{ return new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||'[]')); }catch(e){ return new Set(); }
+}
+function addSeen(repos){
+  const s=loadSeen();
+  repos.forEach(r=>s.add(keyOf(r)));
+  try{ localStorage.setItem(SEEN_KEY,JSON.stringify([...s].slice(-8000))); }catch(e){}
+  showSeenCount();
+}
+function showSeenCount(){
+  const n=loadSeen().size;
+  const b=$('#resetseen');
+  if(b) b.textContent = n ? `Reset seen list (${n})` : 'Reset seen list';
+}
+$('#resetseen').addEventListener('click',()=>{
+  if(!confirm('Seen list clear karein? Uske baad discovery wahi purane repos dobara de sakti hai.')) return;
+  try{ localStorage.removeItem(SEEN_KEY); }catch(e){}
+  showSeenCount();
+});
+showSeenCount();
+
+// har band ka apna 1000-result ceiling hota hai — is se chhote repos surface par aate hain
+function starBands(min,on){
+  const m=Math.max(1,Math.round(min));
+  if(!on) return ['stars:>='+m];
+  const e=[m,Math.round(m*2),Math.round(m*5),Math.round(m*13),Math.round(m*35)];
+  const out=[];
+  for(let i=0;i<e.length-1;i++) if(e[i+1]-1>e[i]) out.push(`stars:${e[i]}..${e[i+1]-1}`);
+  out.push('stars:>='+e[e.length-1]);
+  return out;
+}
+
+function estimateBudget(){
+  const el=$('#budget'); if(!el) return;
+  const seeds=seedsEl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,20).length;
+  const bands=$('#starbands').checked?starBands(Number($('#minstars').value)||300,true).length:1;
+  const pages=clamp(Number($('#pagesper').value)||3,1,10);
+  const rising=$('#risingmode').checked?Math.min(8,seeds):0;
+  const exp=$('#topicexpand').checked?clamp(Number($('#expandtopics').value)||12,3,30):0;
+  const searches=seeds*bands*pages + rising*pages + exp*pages;
+  const mins=Math.max(1,Math.ceil(searches/30));
+  const cands=clamp(Number($('#maxdiscover').value)||300,20,1000);
+  const perSeed=clamp(Number($('#perseed').value)||20,5,100);
+  el.innerHTML=`Plan: <b>${searches}</b> search requests · up to <b>${(searches*perSeed).toLocaleString('en-US')}</b> raw hits `
+    +`→ top <b>${cands}</b> kept. GitHub allows 30 searches/min, so about <b>${mins} min</b> — auto-pause baqi sambhal leta hai. `
+    +`Cached repeats free hain.`;
+}
+['#seeds','#minstars','#perseed','#pagesper','#expandtopics','#maxdiscover'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('input',estimateBudget);
+});
+['#starbands','#topicexpand','#risingmode'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('change',estimateBudget);
+});
+estimateBudget();
+
+function isoDaysAgo(days){ const d=new Date(Date.now()-Math.max(1,days)*86400000); return d.toISOString().slice(0,10); }
+
+async function discoverRepos(){
+  const token=tokEl.value.trim(); if(!token){alert('Token daalein (step 1).');return;}
+  const seeds=seedsEl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).slice(0,20);
+  if(!seeds.length){alert('Kam az kam ek discovery seed likhein.');return;}
+  const minStars=Math.max(0,Number($('#minstars').value)||0), days=Math.max(1,Number($('#updateddays').value)||365);
+  const perSeed=clamp(Number($('#perseed').value)||20,5,100), bias=$('#consumerwords').checked;
+  const topicExpand=$('#topicexpand').checked, rising=$('#risingmode').checked, gapMode=$('#gapmode').checked;
+  const expandN=clamp(Number($('#expandtopics').value)||12,3,30), risingDays=Math.max(30,Number($('#risingdays').value)||365);
+  const maxDiscover=clamp(Number($('#maxdiscover').value)||300,20,1000);
+  const pages=clamp(Number($('#pagesper').value)||3,1,10);
+  const banding=$('#starbands').checked, readmeSearch=$('#readmesearch').checked, skipSeen=$('#skipseen').checked;
+  const inFields=readmeSearch?'in:name,description,readme':'in:name,description';
+  const SEEN=skipSeen?loadSeen():new Set();
+
+  const signature=JSON.stringify({v:9,seeds,minStars,days,perSeed,bias,topicExpand,rising,gapMode,
+                                  expandN,risingDays,maxDiscover,pages,banding,readmeSearch,skipSeen});
+  const btn=$('#discover');btn.disabled=true;$('#discoverstatus').classList.add('show');
+  const map=new Map(), topicCounts=new Map(), bar=$('#discoverbar');
+  const completed=new Set();
+  let restored=false, skipped=0, failedQueries=0;
+  try{
+    const raw=localStorage.getItem(DISCOVERY_STATE_KEY);
+    if(raw){
+      const saved=JSON.parse(raw);
+      if(saved && !saved.finished && saved.signature===signature){
+        (saved.candidates||[]).forEach(x=>map.set(String(x.repo||'').toLowerCase(),x));
+        (saved.topicCounts||[]).forEach(([t,n])=>topicCounts.set(t,n));
+        (saved.completedQueries||[]).forEach(x=>completed.add(x));
+        ACTIVE_DISCOVERY_STATE=saved; restored=true;
+      }
+    }
+  }catch(e){}
+  if(!ACTIVE_DISCOVERY_STATE || !restored){
+    ACTIVE_DISCOVERY_STATE={version:9,finished:false,signature,
+      config:{seeds,minStars,days,perSeed,bias,topicExpand,rising,gapMode,expandN,risingDays,
+              maxDiscover,pages,banding,readmeSearch,skipSeen},
+      completedQueries:[],candidates:[],topicCounts:[]};
+    saveDiscoveryState();
+  }else{
+    $('#discoverstatustxt').textContent=`Resuming saved discovery · ${completed.size} searches already done`;
+  }
+
+  const junk=/awesome|tutorial|course|examples?|template|boilerplate|cheat ?sheet|roadmap|\bsdk\b|\blibrary\b|bindings|leetcode|interview|learning|study|book|notes|dotfiles|config(uration)?s?\b/i;
+  const consumer=/\bapp\b|tool|client|gui|desktop|utility|launcher|downloader|manager|editor|recorder|player|portable|tweaker|customi[sz]|clipboard|taskbar|monitor|transcri|converter|viewer|terminal|organi[sz]er|cleaner|backup|remote|screenshot|wallpaper/i;
+
+  // candidates ko box mein likhna — pehle ye sirf kaamyab run ke aakhir mein hota tha,
+  // is liye beech mein ruk jane par 700+ repos sirf localStorage mein reh jate the
+  let PASTE_T=null;
+  function publishCandidates(note){
+    const vals=[...map.values()].sort((a,b)=>b.rank-a.rank).slice(0,maxDiscover);
+    pasteEl.value=vals.map(x=>x.repo).join('\n');
+    filecount.textContent=(note||`${vals.length} candidates so far`)
+      +(skipped?` · ${skipped} seen skipped`:'');
+    return vals;
+  }
+  function checkpoint(){
+    saveDiscoveryState({completedQueries:[...completed],candidates:[...map.values()],topicCounts:[...topicCounts.entries()]});
+    if(!PASTE_T) PASTE_T=setTimeout(()=>{ PASTE_T=null; publishCandidates(); },500);
+  }
+
+  function addItem(it,source){
+    const key=(it.full_name||'').toLowerCase(); if(!key)return;
+    if(SEEN.has(key)){ skipped++; return; }
+    const text=((it.name||'')+' '+(it.description||'')+' '+(it.topics||[]).join(' ')).toLowerCase();
+    let bonus=0;
+    if(bias&&consumer.test(text)) bonus+=4;
+    if(junk.test(text)) bonus-=7;
+    const stars=it.stargazers_count||0;
+    const created=Date.parse(it.created_at||'');
+    const ageMonths=Math.max(1,(Date.now()-created)/2629800000);
+    const velocity=stars/ageMonths;
+    if(rising) bonus+=Math.min(8,Math.log10(velocity+1)*2.5);
+    const hp=(it.homepage||'').trim();
+    if(gapMode&&!hp) bonus+=5; else if(gapMode&&/github\.io|readthedocs|gitbook|pages\.dev|vercel\.app|netlify\.app/i.test(hp)) bonus+=3;
+    // unmet demand: bohot saare open issues nisbatan stars ke = feature gaps
+    const issueRatio=stars?(it.open_issues_count||0)/stars:0;
+    bonus+=Math.min(3,issueRatio*25);
+    // abhi bhi zinda hai? stale repos ka koi faida nahi
+    const pushedDays=it.pushed_at?(Date.now()-Date.parse(it.pushed_at))/86400000:9999;
+    if(pushedDays>540) bonus-=4;
+    const rank=Math.log10(stars+10)*10000 + velocity*20 + bonus*1500;
+    const prev=map.get(key);
+    if(!prev||rank>prev.rank) map.set(key,{repo:it.full_name,rank,stars,velocity,source,homepage:hp,topics:it.topics||[]});
+    (it.topics||[]).forEach(t=>{
+      t=String(t||'').toLowerCase();
+      if(t.length>2 && !TOPIC_STOP.has(t)) topicCounts.set(t,(topicCounts.get(t)||0)+1);
+    });
+  }
+
+  // ek query ko kai pages par chalata hai; khali page milte hi ruk jata hai
+  async function runSearch(q,label,sort,maxPages){
+    const nPages=Math.min(maxPages||pages,Math.floor(1000/perSeed)||1);
+    for(let p=1;p<=nPages;p++){
+      const taskKey=(sort||'best')+'|'+q+'|p'+p;
+      if(completed.has(taskKey)) continue;
+      $('#discoverstatustxt').textContent=label+(nPages>1?` · page ${p}/${nPages}`:'')
+        +` · ${map.size} kept`+(skipped?` · ${skipped} seen`:'')+(failedQueries?` · ${failedQueries} skipped`:'');
+      saveDiscoveryState({currentQuery:q,currentLabel:label,currentSort:sort||''});
+      const sortParam=sort?`&sort=${sort}&order=desc`:'';   // koi sort nahi = best-match relevance
+      let res;
+      try{
+        res=await ghGet(`https://api.github.com/search/repositories?q=${encodeURIComponent(q)}${sortParam}&per_page=${perSeed}&page=${p}`,token);
+      }catch(e){
+        if(e&&e.fatal) throw e;            // ghalat token wagera par rukna hi chahiye
+        // ek kharab query poori run na mare — skip kar ke aage. completed mein
+        // add NAHI karte, taake resume par ye dobara try ho.
+        // agar lagataar 3 queries network par mari hain to internet hi gaya hua hai —
+        // har query par 9 second retry karne ka koi faida nahi, ruk jao
+        if(e&&e.net&&NET_STREAK>=3) throw e;
+        failedQueries++;
+        console.warn('search failed, skipping:',q,e);
+        break;
+      }
+      const items=(res&&res.items)||[];
+      items.forEach(it=>addItem(it,label));
+      completed.add(taskKey); checkpoint();
+      if(items.length<perSeed) break;      // is query mein aage kuch nahi bacha
+    }
+  }
+
+  const bands=starBands(minStars,banding);
+  try{
+    // --- pass 1: seeds x star bands x pages ---
+    const totalUnits=seeds.length*bands.length;
+    let unit=0;
+    for(let i=0;i<seeds.length;i++){
+      for(let b=0;b<bands.length;b++){
+        bar.style.width=(unit/Math.max(1,totalUnits+expandN)*66)+'%'; unit++;
+        await runSearch(
+          `${seeds[i]} ${inFields} ${bands[b]} pushed:>=${isoDaysAgo(days)} archived:false fork:false`,
+          `Seed ${i+1}/${seeds.length} · ${seeds[i]} · ${bands[b].replace('stars:','★')}`,
+          '' /* best match */);
+      }
+    }
+    // --- pass 2: rising (young + fast stars) ---
+    if(rising){
+      const floor=Math.max(20,Math.floor(minStars/4));
+      for(let i=0;i<Math.min(8,seeds.length);i++){
+        bar.style.width=(66+(i/Math.max(1,Math.min(8,seeds.length)))*12)+'%';
+        await runSearch(
+          `${seeds[i]} ${inFields} stars:>=${floor} created:>=${isoDaysAgo(risingDays)} archived:false fork:false`,
+          `Rising · ${seeds[i]}`,'stars');
+      }
+    }
+    // --- pass 3: topic expansion (>=2 hits only, warna one-off shor) ---
+    if(topicExpand){
+      const topics=[...topicCounts.entries()].filter(([t,n])=>n>=2&&!TOPIC_STOP.has(t))
+                                             .sort((a,b)=>b[1]-a[1]).slice(0,expandN);
+      for(let i=0;i<topics.length;i++){
+        const [topic,count]=topics[i];
+        bar.style.width=(78+(i/Math.max(1,topics.length))*20)+'%';
+        await runSearch(
+          `topic:${topic} stars:>=${Math.max(50,Math.floor(minStars/2))} pushed:>=${isoDaysAgo(days)} archived:false fork:false`,
+          `Expand ${i+1}/${topics.length} · ${topic} (${count} hits)`,'stars');
+      }
+    }
+  }catch(e){
+    checkpoint();
+    if(PASTE_T){ clearTimeout(PASTE_T); PASTE_T=null; }
+    const partial=publishCandidates(`${Math.min(map.size,maxDiscover)} candidates ready to verify (Discover dobara dabayein to aur milenge)`);
+    if(e.fatal) alert(e.msg); else console.error('Discovery stopped:',e);
+    $('#discoverstatustxt').textContent=`Stopped · ${partial.length} candidates already in the box below`
+      +` · ${completed.size} searches done · press Discover to resume`;
+    btn.disabled=false;
+    return;
+  }
+
+  if(PASTE_T){ clearTimeout(PASTE_T); PASTE_T=null; }
+  const vals=publishCandidates(`Discovered ${Math.min(map.size,maxDiscover)} candidates`);
+  const clusters=[...topicCounts.entries()].filter(([t])=>!TOPIC_STOP.has(t)).sort((a,b)=>b[1]-a[1]).slice(0,14);
+  LAST_TOPIC_CLUSTERS=clusters;   // auto mode is baad mein self-expand karne ke liye padhta hai
+  $('#clusters').innerHTML=clusters.length?'<b>Emerging topic clusters:</b> '+clusters.map(([t,n])=>`${esc(t)} (${n})`).join(' · '):'';
+  bar.style.width='100%';
+  $('#discoverstatustxt').textContent=`Done · ${vals.length} candidates · ${topicCounts.size} topic signals`
+    +(skipped?` · ${skipped} seen skipped`:'')+(failedQueries?` · ${failedQueries} queries skipped`:'')
+    +` · ${completed.size} searches`;
+  saveDiscoveryState({finished:true,currentQuery:null,currentLabel:null,waitingUntil:null,waitingUrl:null});
+  clearDiscoveryState();
+  btn.disabled=false;
+}
+$('#discover').addEventListener('click',discoverRepos);
+
+// ---- API ----
+const DOC_HOSTS=['github.com','github.io','readthedocs','readthedocs.io','gitlab.com','gitbook.io','pages.dev','vercel.app','netlify.app'];
+const SOCIAL_HOSTS=['discord.gg','discord.com','youtube.com','youtu.be','x.com','twitter.com','reddit.com','t.me','patreon.com','ko-fi.com','buymeacoffee.com'];
+const CONSUMER_EXT=/\.(exe|msi|msix|appx|dmg|pkg|apk|appimage|deb|rpm|flatpak|snap|zip|7z|portable\.zip)$/i;
+const DEV_EXT=/\.(dll|lib|a|so|jar|nupkg|whl|gem|crate|tar\.gz|tgz|src\.zip|source\.zip)$/i;
+let RESULTS=[], SORT={k:'score',dir:-1}, FILTER='all';
+let NICHE_CACHE=null, NSORT={k:'score',dir:-1}, TAB='repos';
+
+/* =====================================================================
+   SAVE / RESTORE  —  taake dobara scratch se shuru na karna pare
+   • har scan ke baad data khud is browser mein mehfooz ho jata hai
+   • "Save scan (.json)" se file bana kar kahin bhi rakh sakte hain
+   • "Import saved scan" se wo file (ya export ki hui CSV) wapas aa jati hai
+   • TOKEN kabhi save ya export nahi hota
+   ===================================================================== */
+const SESSION_KEY='np_session_v2';
+let BASELINE={};   // repo -> {downloads, at}  : pichli scan ka snapshot, farq dikhane ke liye
+
+const keyOf = r => String(r||'').toLowerCase();
+
+function sessionPayload(){
+  return {app:'niche-prospector-v8', schema:3, savedAt:new Date().toISOString(),
+          repos:RESULTS.map(r=>r.repo), baseline:BASELINE, results:RESULTS};
+}
+function autosave(){
+  try{
+    if(RESULTS.length) localStorage.setItem(SESSION_KEY,JSON.stringify(sessionPayload()));
+    else localStorage.removeItem(SESSION_KEY);
+  }catch(e){}   // storage full ya blocked — scan phir bhi chalta rahe
+}
+function showBanner(msg){ $('#bannertxt').textContent=msg; $('#banner').classList.add('show'); }
+
+function download(text,name,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([text],{type:type||'text/plain'}));
+  a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+// file se aane wali row ko safe shakal dena (koi field ghayab ho to bhi na toote)
+function normRow(o){
+  const num=v=>{ const n=Number(v); return isFinite(n)?n:0; };
+  const repo=String(o.repo||'').trim();
+  if(!repo) return null;
+  const r={repo, stars:num(o.stars), forks:num(o.forks), starVelocity:num(o.starVelocity), repoAgeMonths:num(o.repoAgeMonths), downloads:num(o.downloads), ratio:num(o.ratio),
+    perMonth:num(o.perMonth), lifePerMonth:num(o.lifePerMonth), relAgeDays:num(o.relAgeDays),
+    fresh:!!o.fresh, latestDl:num(o.latestDl), latestTag:String(o.latestTag||''),
+    latestPre:!!o.latestPre, latestUrl:String(o.latestUrl||''), latestAssets:num(o.latestAssets),
+    lastRelease:num(o.lastRelease), previousReleaseDl:num(o.previousReleaseDl), releaseMomentum:num(o.releaseMomentum), description:String(o.description||''), topics:Array.isArray(o.topics)?o.topics:[],
+    language:String(o.language||''), platform:String(o.platform||'Unknown'), category:String(o.category||'Other'),
+    consumerIntent:String(o.consumerIntent||'unknown'), consumerAssets:num(o.consumerAssets), devAssets:num(o.devAssets),
+    siteLevel:String(o.siteLevel||((o.site==='NO')?'none':(o.site==='yes'?'dedicated':'unknown'))),
+    siteUrl:String(o.siteUrl||''), site:(o.site==='yes'||o.site==='NO')?o.site:'—',
+    momentum:num(o.momentum), measuredMonthly:num(o.measuredMonthly), score:num(o.score), scoreParts:o.scoreParts||{},
+    releaseCount:num(o.releaseCount), releasesTruncated:!!o.releasesTruncated,
+    openIssues:num(o.openIssues), issueRatio:num(o.issueRatio),
+    pushedDays:(o.pushedDays===''||o.pushedDays==null)?null:num(o.pushedDays),
+    readmeHeads:Array.isArray(o.readmeHeads)?o.readmeHeads:[],
+    err:!!o.err, scannedAt:String(o.scannedAt||'')};
+  if(!r.ratio && r.stars) r.ratio=r.downloads/r.stars;
+  if(!r.issueRatio && r.stars && r.openIssues) r.issueRatio=r.openIssues/r.stars;
+  if(!r.err) applyOpportunityScore(r);   // weights badal sakte hain, is liye hamesha dobara score
+  if(o.fresh===undefined) r.fresh = r.lastRelease>0 && r.relAgeDays>0 && r.relAgeDays<10;
+  // purani CSV mein release ka link nahi hota — tag se bana lein taake clickable rahe
+  if(!r.latestUrl && r.latestTag) r.latestUrl='https://github.com/'+repo+'/releases/tag/'+encodeURIComponent(r.latestTag);
+  return r;
+}
+
+function loadResults(rows,opts){
+  opts=opts||{};
+  const clean=rows.map(normRow).filter(Boolean);
+  if(!clean.length) return 0;
+  if(opts.merge && RESULTS.length){
+    const map=new Map(RESULTS.map(r=>[keyOf(r.repo),r]));
+    clean.forEach(r=>map.set(keyOf(r.repo),r));   // file ka data purane par chadh jata hai
+    RESULTS=[...map.values()];
+  }else{
+    RESULTS=clean;
+  }
+  if(opts.baseline) BASELINE=opts.baseline;
+  // repo list wapas box mein, taake dobara scan sirf ek click door ho
+  pasteEl.value=RESULTS.map(r=>r.repo).join('\n');
+  filecount.textContent='';
+  $('#toolbar').classList.add('show');
+  NICHE_CACHE=null;
+  renderTab();
+  return clean.length;
+}
+
+// ---- import ----
+$('#import').addEventListener('click',()=>$('#importfile').click());
+$('#importfile').addEventListener('change',e=>{
+  const f=e.target.files[0];
+  if(f){ const r=new FileReader(); r.onload=()=>handleImportText(r.result,f.name); r.readAsText(f); }
+  e.target.value='';   // wahi file dobara chunne par bhi change chale
+});
+
+function askMerge(n){
+  if(!RESULTS.length) return false;
+  return confirm('Table mein pehle se '+RESULTS.length+' repos hain, file mein '+n+'.\n\n'
+    +'OK\t= MERGE (file ka data purane ko update karega, baqi rahenge)\n'
+    +'Cancel\t= REPLACE (sirf file wala data rahega)');
+}
+
+function handleImportText(text,name){
+  const t=String(text||'').trim();
+  if(!t){ alert('File khali hai.'); return; }
+
+  // 1) saved .json scan
+  if(t[0]==='{'||t[0]==='['){
+    let data;
+    try{ data=JSON.parse(t); }
+    catch(err){ alert('Ye JSON parh nahi saka:\n'+err.message); return; }
+    const rows=Array.isArray(data)?data:(data.results||[]);
+    if(!rows.length){ alert('Is file mein koi scan result nahi mila.'); return; }
+    const merge=askMerge(rows.length);
+    const n=loadResults(rows,{merge, baseline:(!merge && data.baseline)?data.baseline:BASELINE});
+    autosave();
+    showBanner('Imported '+n+' repos from '+name+(data.savedAt?' · saved '+data.savedAt.slice(0,10):''));
+    return;
+  }
+
+  // 2) is app ki export ki hui results CSV
+  const rows=parseResultCsv(t);
+  if(rows.length){
+    const merge=askMerge(rows.length);
+    const n=loadResults(rows,{merge});
+    autosave();
+    showBanner('Imported '+n+' repos from '+name);
+    return;
+  }
+
+  // 3) sirf repo list — box mein daal dein
+  const repos=parseRepos(t);
+  if(repos.length){
+    pasteEl.value=repos.join('\n');
+    filecount.textContent='Loaded: '+name+' · '+repos.length+' repos';
+    alert(repos.length+' repos list mein aa gaye. Ab "Scan downloads" dabayein.');
+    return;
+  }
+  alert('Is file ko pehchan nahi saka.\nSaved .json ya isi app ki export ki hui .csv dein.');
+}
+
+// quoted fields ko sahi handle karne wala chhota CSV reader
+function splitCsvLine(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(q){
+      if(c==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else q=false; }
+      else cur+=c;
+    }else if(c==='"'){ q=true; }
+    else if(c===','){ out.push(cur); cur=''; }
+    else cur+=c;
+  }
+  out.push(cur);
+  return out;
+}
+
+function parseResultCsv(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) return [];
+  const head=splitCsvLine(lines[0]).map(h=>h.trim().toLowerCase());
+  if(head.indexOf('repo')<0 || head.indexOf('total_downloads')<0) return [];   // ye results CSV nahi
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const c=splitCsvLine(lines[i]);
+    const get=n=>{ const k=head.indexOf(n); return k<0?'':String(c[k]||'').trim(); };
+    const repo=get('repo'); if(!repo) continue;
+    const d=get('latest_release_date');
+    const ts=d?Date.parse(d+'T00:00:00Z'):0;
+    out.push({repo, score:get('opportunity_score'), category:get('category'), platform:get('platform'),
+      consumerIntent:get('consumer_intent'),consumerAssets:get('consumer_assets'), stars:get('stars'),starVelocity:get('stars_per_month'), downloads:get('total_downloads'),
+      latestDl:get('latest_release_downloads'), latestTag:get('latest_release_tag'),
+      lastRelease:isFinite(ts)?ts:0, relAgeDays:get('latest_release_age_days'),
+      latestPre:get('latest_is_prerelease')==='yes', previousReleaseDl:get('previous_release_downloads'),releaseMomentum:get('release_momentum'), ratio:get('downloads_per_star'),
+      perMonth:get('current_downloads_per_month'), lifePerMonth:get('lifetime_downloads_per_month'), momentum:get('momentum'),
+      siteLevel:get('web_presence'),siteUrl:get('site_url'), site:get('site'),
+      openIssues:get('open_issues'), issueRatio:get('issue_ratio'), pushedDays:get('days_since_push'),
+      topics:get('topics')?get('topics').split(/\s+/).filter(Boolean):[],
+      scannedAt:get('scanned_at')});
+  }
+  return out;
+}
+
+// ---- save to file ----
+$('#save').addEventListener('click',()=>{
+  if(!RESULTS.length) return;
+  download(JSON.stringify(sessionPayload(),null,2),
+           'niche-scan-'+new Date().toISOString().slice(0,10)+'.json','application/json');
+});
+
+// ---- is browser se saved data hatana ----
+$('#forget').addEventListener('click',()=>{
+  if(!confirm('Is browser se saved scan hata dein?\n(Export ki hui file mehfooz rahegi.)')) return;
+  try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem('np_session_v1'); }catch(e){}
+  RESULTS=[]; BASELINE={};
+  $('#banner').classList.remove('show');
+  $('#toolbar').classList.remove('show');
+  render();
+});
+
+const DISCOVERY_STATE_KEY='np_discovery_v9';
+let ACTIVE_DISCOVERY_STATE=null;
+let LAST_TOPIC_CLUSTERS=[];
+
+function saveDiscoveryState(extra){
+  try{
+    if(!ACTIVE_DISCOVERY_STATE) return;
+    Object.assign(ACTIVE_DISCOVERY_STATE,extra||{}, {savedAt:new Date().toISOString()});
+    localStorage.setItem(DISCOVERY_STATE_KEY,JSON.stringify(ACTIVE_DISCOVERY_STATE));
+  }catch(e){}
+}
+function clearDiscoveryState(){
+  ACTIVE_DISCOVERY_STATE=null;
+  try{ localStorage.removeItem(DISCOVERY_STATE_KEY); }catch(e){}
+}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* =====================================================================
+   V9.2 AUTO MODE
+   Tab khuli rehte hue app khud ek timer par discovery (+ verify) chalati
+   hai — koi click zaroori nahi. Har cycle ke baad emerging topic clusters
+   (jo discoverRepos ne khud dhoonde) un topics ko naye seed bana dete hain,
+   taake agli baar wahi purani seeds na dohrayi jayein, balke app naye
+   niches ki taraf khud barhe. Ye sirf is tab ke andar chalta hai — browser
+   band ho ya laptop so jaye to timer bhi ruk jata hai; wapas aane par jitna
+   waqt guzar chuka wo hisaab mein aata hai.
+   ===================================================================== */
+const AUTO_KEY='np_auto_v2';
+const AUTO_PINNED_KEY='np_auto_pinned_seeds_v1';
+const autoEnabledEl=$('#autoEnabled'), autoIntervalEl=$('#autoInterval'),
+      autoExpandNEl=$('#autoExpandN'), autoVerifyChk=$('#autoVerifyChk'),
+      autoExpandChk=$('#autoExpandChk'), autoStatusEl=$('#autoStatus');
+let AUTO_TIMER=null, AUTO_TICK_TIMER=null, AUTO_BUSY=false;
+
+function loadAutoState(){
+  try{ return JSON.parse(localStorage.getItem(AUTO_KEY)||'{}'); }catch(e){ return {}; }
+}
+function saveAutoState(extra){
+  const s=Object.assign(loadAutoState(),extra||{});
+  try{ localStorage.setItem(AUTO_KEY,JSON.stringify(s)); }catch(e){}
+  return s;
+}
+function autoConfigFromUI(){
+  return {
+    enabled: autoEnabledEl.checked,
+    intervalHrs: clamp(Number(autoIntervalEl.value)||6,1,168),
+    expandPerCycle: clamp(Number(autoExpandNEl.value)||0,0,10),
+    autoVerify: autoVerifyChk.checked,
+    autoExpand: autoExpandChk.checked
+  };
+}
+function getPinnedSeeds(){
+  try{ return new Set(JSON.parse(localStorage.getItem(AUTO_PINNED_KEY)||'[]')); }catch(e){ return new Set(); }
+}
+function pinCurrentSeeds(){
+  const cur=seedsEl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  try{ localStorage.setItem(AUTO_PINNED_KEY,JSON.stringify(cur)); }catch(e){}
+}
+
+// har cycle ke baad naye emerging topics ko seed bana dena — is se agli
+// discovery hamesha aage badhti hai, wahi purani seeds par nahi atki rehti
+function autoExpandSeeds(maxNew){
+  if(!maxNew || !LAST_TOPIC_CLUSTERS.length) return 0;
+  let cur=seedsEl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const lower=new Set(cur.map(x=>x.toLowerCase()));
+  const added=[];
+  for(const [topic] of LAST_TOPIC_CLUSTERS){
+    if(added.length>=maxNew) break;
+    const t=String(topic||'').trim(); if(!t||lower.has(t.toLowerCase())) continue;
+    added.push(t); lower.add(t.toLowerCase());
+  }
+  if(!added.length) return 0;
+  cur=cur.concat(added);
+  if(cur.length>20){
+    const pinned=getPinnedSeeds(), overflow=cur.length-20, keep=[];
+    let dropped=0;
+    for(const s of cur){
+      if(dropped<overflow && !pinned.has(s) && !added.includes(s)){ dropped++; continue; }
+      keep.push(s);
+    }
+    cur=keep.length>20?keep.slice(keep.length-20):keep;
+  }
+  seedsEl.value=cur.join('\n');
+  estimateBudget();
+  return added.length;
+}
+
+function fmtAutoWhen(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return d.toISOString().slice(0,16).replace('T',' ')+' UTC';
+}
+function updateAutoStatus(){
+  const cfg=autoConfigFromUI(), st=loadAutoState();
+  if(!cfg.enabled){ autoStatusEl.textContent='Auto mode off.'; return; }
+  const parts=[`Auto mode ON · every ${cfg.intervalHrs}h`];
+  if(st.runCount) parts.push(`${st.runCount} auto run${st.runCount===1?'':'s'} so far`);
+  if(st.lastRunAt) parts.push(`last: ${fmtAutoWhen(st.lastRunAt)}`);
+  if(AUTO_BUSY) parts.push('running now…');
+  else if(st.nextRunAt) parts.push(`next: ${fmtAutoWhen(st.nextRunAt)}`);
+  if(!tokEl.value.trim()) parts.push('waiting for a token (step 1)');
+  autoStatusEl.textContent=parts.join(' · ');
+}
+
+function clearAutoTimers(){
+  if(AUTO_TIMER){ clearTimeout(AUTO_TIMER); AUTO_TIMER=null; }
+  if(AUTO_TICK_TIMER){ clearInterval(AUTO_TICK_TIMER); AUTO_TICK_TIMER=null; }
+}
+
+function scheduleAuto(delayMs){
+  clearAutoTimers();
+  const cfg=autoConfigFromUI();
+  if(!cfg.enabled) return;
+  delayMs=Math.max(1000,delayMs);
+  saveAutoState({nextRunAt:Date.now()+delayMs});
+  AUTO_TIMER=setTimeout(autoTick,delayMs);
+  AUTO_TICK_TIMER=setInterval(updateAutoStatus,30000);
+  updateAutoStatus();
+}
+
+async function autoTick(){
+  const cfg=autoConfigFromUI();
+  if(!cfg.enabled || AUTO_BUSY) return;
+  if(!tokEl.value.trim()){
+    // token abhi tak nahi diya — thodi der baad phir dekh lein, poora interval na ghisatein
+    updateAutoStatus();
+    scheduleAuto(5*60*1000);
+    return;
+  }
+  if($('#discover').disabled || $('#scan').disabled){
+    // ek discovery/verify (jaise page-load resume) pehle se chal rahi hai — is se na takrayein
+    scheduleAuto(30*1000);
+    return;
+  }
+  AUTO_BUSY=true; updateAutoStatus();
+  try{
+    if(cfg.autoExpand && !getPinnedSeeds().size) pinCurrentSeeds();
+    await discoverRepos();
+    let addedN=0;
+    if(cfg.autoExpand) addedN=autoExpandSeeds(cfg.expandPerCycle);
+    if(cfg.autoVerify && parseRepos(pasteEl.value).length) await runVerify();
+    const st=loadAutoState();
+    saveAutoState({lastRunAt:Date.now(),runCount:(st.runCount||0)+1,lastAdded:addedN});
+  }catch(e){
+    console.error('Auto mode cycle failed:',e);
+  }finally{
+    AUTO_BUSY=false;
+    scheduleAuto(clamp(Number(autoIntervalEl.value)||6,1,168)*3600000);
+  }
+}
+
+function persistAutoConfig(){
+  const cfg=autoConfigFromUI();
+  saveAutoState(cfg);
+  return cfg;
+}
+
+autoEnabledEl.addEventListener('change',()=>{
+  const cfg=persistAutoConfig();
+  if(cfg.enabled){
+    if(cfg.autoExpand) pinCurrentSeeds();
+    const st=loadAutoState();
+    const due=st.lastRunAt?Math.max(0,st.lastRunAt+cfg.intervalHrs*3600000-Date.now()):3000;
+    scheduleAuto(due||3000);
+  }else{
+    clearAutoTimers();
+    updateAutoStatus();
+  }
+});
+[autoIntervalEl,autoExpandNEl].forEach(el=>el.addEventListener('input',()=>{
+  const cfg=persistAutoConfig();
+  if(cfg.enabled){
+    const st=loadAutoState();
+    const due=st.lastRunAt?Math.max(0,st.lastRunAt+cfg.intervalHrs*3600000-Date.now()):3000;
+    scheduleAuto(due||3000);
+  }
+}));
+[autoVerifyChk,autoExpandChk].forEach(el=>el.addEventListener('change',persistAutoConfig));
+
+function initAutoMode(){
+  const st=loadAutoState();
+  autoEnabledEl.checked=!!st.enabled;
+  if(st.intervalHrs) autoIntervalEl.value=st.intervalHrs;
+  if(st.expandPerCycle!=null) autoExpandNEl.value=st.expandPerCycle;
+  if(st.autoVerify!=null) autoVerifyChk.checked=!!st.autoVerify;
+  if(st.autoExpand!=null) autoExpandChk.checked=!!st.autoExpand;
+  updateAutoStatus();
+  if(!st.enabled) return;
+  const cfg=autoConfigFromUI();
+  const due=st.lastRunAt?Math.max(0,st.lastRunAt+cfg.intervalHrs*3600000-Date.now()):4000;
+  scheduleAuto(due||4000);
+}
+
+/* =====================================================================
+   V9 HTTP CACHE
+   GitHub har response ke sath ek ETag deta hai. Agli baar wahi ETag
+   If-None-Match mein bhej dein to GitHub 304 (Not Modified) deta hai —
+   aur 304 aap ke rate limit se NAHI kaata. Yani dobara scan karna
+   lagbhag muft. IndexedDB use hoti hai; file:// par wo block ho to
+   apne aap memory-only cache par gir jata hai.
+   ===================================================================== */
+const CACHE=(()=>{
+  const mem=new Map();
+  let db=null, ready=null;
+  function open(){
+    if(ready) return ready;
+    ready=new Promise(res=>{
+      let settled=false;
+      const done=v=>{ if(!settled){ settled=true; res(v); } };
+      try{
+        const q=indexedDB.open('np_cache_v1',1);
+        q.onupgradeneeded=()=>{ try{ q.result.createObjectStore('kv'); }catch(e){} };
+        q.onsuccess=()=>{ db=q.result; done(true); };
+        q.onerror=()=>done(false);
+        q.onblocked=()=>done(false);
+        setTimeout(()=>done(!!db),2000);
+      }catch(e){ done(false); }
+    });
+    return ready;
+  }
+  function op(mode,fn){
+    return new Promise((res,rej)=>{
+      try{
+        const t=db.transaction('kv',mode), st=t.objectStore('kv'), r=fn(st);
+        t.oncomplete=()=>res(r?r.result:undefined);
+        t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error);
+      }catch(e){ rej(e); }
+    });
+  }
+  return {
+    async get(k){
+      if(mem.has(k)) return mem.get(k);
+      await open(); if(!db) return null;
+      try{ const v=await op('readonly',st=>st.get(k)); if(v) mem.set(k,v); return v||null; }
+      catch(e){ return null; }
+    },
+    async set(k,v){
+      mem.set(k,v);
+      await open(); if(!db) return;
+      try{ await op('readwrite',st=>st.put(v,k)); }catch(e){}
+    },
+    async clear(){
+      mem.clear(); await open(); if(!db) return;
+      try{ await op('readwrite',st=>st.clear()); }catch(e){}
+    },
+    async count(){
+      await open(); if(!db) return mem.size;
+      try{ return await op('readonly',st=>st.count()); }catch(e){ return mem.size; }
+    }
+  };
+})();
+
+// cache mein poora GitHub payload rakhne ki zaroorat nahi — sirf wo fields jo app parhta hai
+function slimRepo(x){
+  return {full_name:x.full_name,name:x.name,description:x.description,topics:x.topics||[],
+    stargazers_count:x.stargazers_count||0,forks_count:x.forks_count||0,
+    open_issues_count:x.open_issues_count||0,created_at:x.created_at,pushed_at:x.pushed_at,
+    homepage:x.homepage,language:x.language,archived:!!x.archived};
+}
+function slimResponse(url,data){
+  try{
+    const path=url.split('?')[0];
+    if(path.includes('/search/repositories')) return {items:(data.items||[]).map(slimRepo),total_count:data.total_count||0};
+    if(/\/repos\/[^/]+\/[^/]+$/.test(path)) return slimRepo(data);
+    if(path.includes('/releases')) return (data||[]).map(r=>({
+      tag_name:r.tag_name,name:r.name,published_at:r.published_at,draft:!!r.draft,
+      prerelease:!!r.prerelease,html_url:r.html_url,
+      assets:(r.assets||[]).map(a=>({name:a.name,download_count:a.download_count||0}))}));
+    if(path.includes('/readme')) return {content:data.content};
+  }catch(e){}
+  return data;
+}
+
+let CORE_LEFT='—', SEARCH_LEFT='—', CACHE_HITS=0, CACHE_TTL_MS=0;
+let NET_STREAK=0;   // lagataar network failures — internet band ho to ghisatna nahi chahiye
+function updateRl(){
+  const hit=CACHE_HITS?` · ${CACHE_HITS} from cache`:'';
+  $('#rl').textContent='API left: '+CORE_LEFT+hit;
+  $('#searchrl').textContent='Search API left: '+SEARCH_LEFT+hit;
+}
+async function refreshCacheStat(){
+  const el=$('#cachestat'); if(!el) return;
+  const n=await CACHE.count();
+  el.innerHTML=`<b>${n}</b> responses stored · <b>${CACHE_HITS}</b> hits this session`;
+}
+$('#clearcache').addEventListener('click',async()=>{
+  await CACHE.clear(); CACHE_HITS=0; refreshCacheStat(); updateRl();
+});
+$('#cachehours').addEventListener('input',e=>{
+  CACHE_TTL_MS=Math.max(0,Number(e.target.value)||0)*3600000;
+});
+refreshCacheStat();
+
+async function ghGet(url,token,quiet){
+  const isSearch=url.includes('/search/');
+  const cached=await CACHE.get(url);
+  // "reuse under N hrs" — bilkul request hi na bhejein
+  if(cached && CACHE_TTL_MS>0 && (Date.now()-(cached.at||0))<CACHE_TTL_MS){
+    CACHE_HITS++; updateRl(); return cached.data;
+  }
+  let attempts=0, serverRetries=0, netRetries=0;
+  while(true){
+    const headers={Authorization:'Bearer '+token,Accept:'application/vnd.github+json',
+                   'X-GitHub-Api-Version':'2022-11-28'};
+    if(cached&&cached.etag) headers['If-None-Match']=cached.etag;
+    // no-store: browser apni cache se 304 ko 200 mein na badal de
+    let res;
+    try{
+      res=await fetch(url,{headers,cache:'no-store'});
+    }catch(netErr){
+      // wifi girna / DNS blip — pehle ye poori discovery kha jata tha
+      if(netRetries<3){
+        netRetries++;
+        $('#discoverstatustxt').textContent='Network hiccup · retrying in '+(1.5*netRetries)+'s…';
+        await sleep(1500*netRetries);
+        continue;
+      }
+      NET_STREAK++;
+      throw {net:true,msg:'Network error: '+((netErr&&netErr.message)||netErr)};
+    }
+    NET_STREAK=0;   // koi bhi HTTP jawab aaya = connection zinda hai
+    const rl=res.headers.get('x-ratelimit-remaining');
+    if(rl!==null){ if(isSearch) SEARCH_LEFT=rl; else CORE_LEFT=rl; updateRl(); }
+
+    // 304 = data waisa hi hai, aur ye rate limit se nahi kata
+    if(res.status===304 && cached){ CACHE_HITS++; updateRl(); return cached.data; }
+
+    if(res.status===401) throw {fatal:true,msg:'Bad token (401). Check step 1.'};
+    if(res.status===404 && quiet) return null;
+    // GitHub search sirf pehle 1000 results deta hai — us se aage 422 aata hai.
+    // Ye khata nahi, bus is query ka anjaam hai.
+    if(res.status===422 && isSearch) return {items:[],total_count:0};
+    // 500/502/503 GitHub ki apni hichki hoti hai, permanent error nahi
+    if(res.status>=500 && res.status<600 && serverRetries<5){
+      serverRetries++;
+      await sleep(Math.min(20000,1500*Math.pow(2,serverRetries)));
+      continue;
+    }
+    if((res.status===403||res.status===429) && attempts<20){
+      const remaining=Number(res.headers.get('x-ratelimit-remaining'));
+      const hasReset=!!res.headers.get('x-ratelimit-reset');
+      const hasRetry=!!res.headers.get('retry-after');
+      if(remaining===0 || hasReset || hasRetry || isSearch){
+        attempts++;
+        await waitForApiReset(res,url);
+        continue; // exact same request retries, so no seed/topic is skipped
+      }
+    }
+    if(res.status===403) throw {fatal:!quiet,msg:'Forbidden (403). GitHub did not provide a usable reset window.'};
+    if(res.status===429) throw {fatal:!quiet,msg:'Too many requests (429). GitHub did not provide a usable reset window.'};
+    if(!res.ok) throw {msg:'HTTP '+res.status};
+
+    const raw=await res.json();
+    const data=slimResponse(url,raw);
+    const etag=res.headers.get('etag');
+    if(etag){ CACHE.set(url,{etag,data,at:Date.now()}).then(refreshCacheStat); }
+    return data;
+  }
+}
+
+async function scanReleases(repo,token,maxPages){
+  let total=0,page=1,firstDate=null,stable=null,any=null,stableList=[],assetNames=[],releaseCount=0,truncated=false;
+  const cap=Math.max(1,maxPages||3);
+  while(true){
+    const rel=await ghGet(`https://api.github.com/repos/${repo}/releases?per_page=100&page=${page}`,token);
+    if(!rel||!rel.length) break;
+    rel.forEach(r=>{
+      let dl=0; releaseCount++;
+      (r.assets||[]).forEach(a=>{ dl+=a.download_count||0; if(a.name) assetNames.push(a.name); });
+      total+=dl;
+      if(r.draft||!r.published_at) return;           // drafts aren't public releases
+      const d=new Date(r.published_at);
+      if(!firstDate||d<firstDate) firstDate=d;
+      const item={date:d,downloads:dl,tag:r.tag_name||r.name||'',
+                  pre:!!r.prerelease,url:r.html_url||'',assets:(r.assets||[]).length};
+      if(!any||d>any.date) any=item;
+      if(!r.prerelease){ stableList.push(item); if(!stable||d>stable.date) stable=item; }
+    });
+    if(rel.length<100) break;
+    if(page>=cap){ truncated=true; break; }   // 900 releases wale repo par 9 calls kharch na hon
+    page++;
+  }
+  // GitHub calls the newest *stable* release "Latest"; only fall back to a
+  // prerelease when the repo has never shipped a stable one.
+  stableList.sort((a,b)=>b.date-a.date);
+  const chosen=stable||any;
+  const previous=stableList.length>1?stableList[1]:null;
+  return {total,firstDate,latest:chosen,previous,assetNames,releaseCount,truncated};
+}
+
+function hostOf(u){
+  try{ return new URL(/^https?:\/\//i.test(u)?u:'https://'+u).hostname.toLowerCase().replace(/^www\./,''); }
+  catch(e){ return ''; }
+}
+function isHostIn(host,list){ return list.some(x=>host===x||host.endsWith('.'+x)); }
+function extractUrls(text){
+  const out=[], seen=new Set();
+  (String(text||'').match(/https?:\/\/[^\s)\]}>"']+/gi)||[]).forEach(u=>{
+    u=u.replace(/[.,;:!?]+$/,''); const h=hostOf(u);
+    if(h&&!seen.has(h)){ seen.add(h); out.push(u); }
+  });
+  return out;
+}
+async function readmeText(repo,token){
+  try{
+    const r=await ghGet(`https://api.github.com/repos/${repo}/readme`,token,true);
+    if(!r||!r.content) return '';
+    const bin=atob(String(r.content).replace(/\n/g,''));
+    const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  }catch(e){ return ''; }
+}
+// README ke H2/H3 asli feature words dete hain — keyword ideas inhi se banti hain
+const HEAD_SKIP=/^(install|setup|licen[cs]|contribut|credits?|table of contents|contents|toc|acknowledg|star history|stargazers|contributors?|donat|sponsor|support|change ?log|faq|build|usage|getting started|quick ?start|requirement|prerequisite|disclaimer|todo|roadmap|about|introduction|overview|screenshot|demo|thanks|author|related|similar|note)/i;
+function readmeHeadings(md){
+  const out=[], seen=new Set();
+  String(md||'').split(/\r?\n/).forEach(l=>{
+    const m=l.match(/^#{2,3}\s+(.{3,52}?)\s*#*\s*$/);
+    if(!m) return;
+    const h=m[1].replace(/[`*_\[\]()<>:|]/g,'').replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu,'').trim();
+    if(!h||h.length<3||h.length>46) return;
+    if(HEAD_SKIP.test(h)) return;
+    const k=h.toLowerCase();
+    if(seen.has(k)) return;
+    seen.add(k); out.push(h);
+  });
+  return out.slice(0,10);
+}
+function webPresence(homepage,readme){
+  const hp=String(homepage||'').trim(), hpHost=hostOf(hp);
+  if(hpHost){
+    if(isHostIn(hpHost,DOC_HOSTS)) return {level:'docs',url:hp,host:hpHost};
+    if(!isHostIn(hpHost,SOCIAL_HOSTS)) return {level:'dedicated',url:hp,host:hpHost};
+  }
+  const urls=extractUrls(readme);
+  const external=urls.find(u=>{ const h=hostOf(u); return h&&!isHostIn(h,DOC_HOSTS)&&!isHostIn(h,SOCIAL_HOSTS)&&!h.endsWith('githubusercontent.com')&&h!=='shields.io'&&h!=='img.shields.io'; });
+  if(external) return {level:'readme',url:external,host:hostOf(external)};
+  const docs=urls.find(u=>isHostIn(hostOf(u),DOC_HOSTS));
+  if(docs||hpHost) return {level:'docs',url:docs||hp,host:hostOf(docs||hp)};
+  return {level:'none',url:'',host:''};
+}
+function detectPlatform(info,assetNames){
+  const t=((info.topics||[]).join(' ')+' '+(info.description||'')+' '+assetNames.join(' ')).toLowerCase();
+  const p=[];
+  if(/windows|win32|win64|\.exe\b|\.msi\b|\.msix\b/.test(t)) p.push('Windows');
+  if(/macos|mac os|osx|darwin|\.dmg\b|\.pkg\b/.test(t)) p.push('macOS');
+  if(/android|\.apk\b/.test(t)) p.push('Android');
+  if(/linux|appimage|\.deb\b|\.rpm\b|flatpak|snap\b/.test(t)) p.push('Linux');
+  return p.length>2?'Cross-platform':(p.join(' + ')||'Unknown');
+}
+function detectCategory(info){
+  const t=(info.name+' '+(info.description||'')+' '+(info.topics||[]).join(' ')).toLowerCase();
+  const rules=[
+    ['Downloader',/download|yt-dlp|gallery-dl|grabber/],['Launcher',/launcher|bootstrapper|client launcher/],
+    ['Media Tool',/video|audio|media|ffmpeg|transcod|subtitle|screen record|recorder/],['PDF / Docs',/pdf|document|ocr/],
+    ['File Tool',/file manager|archive|compress|extract|rename|sync|transfer/],['Customization',/theme|taskbar|wallpaper|customi[sz]|desktop tweak/],
+    ['AI Utility',/\bai\b|llm|whisper|transcri|speech|stable diffusion|ollama/],['Privacy / Security',/privacy|vpn|firewall|password|encrypt|security/],
+    ['Developer Tool',/sdk|library|framework|cli|developer|api client|compiler|runtime/],['Utility',/utility|tool|gui|desktop app|productivity/]
+  ];
+  for(const [name,re] of rules) if(re.test(t)) return name;
+  if($('#unknownmode')&&$('#unknownmode').checked){
+    if(/clipboard|taskbar|workspace|brightness|monitor|flyout|shell|tiling|hotkey|shortcut|backup|sharing|transfer|remote|terminal|dashboard|notepad|reader|viewer|capture|screenshot|dictionary|translator/.test(t)) return 'Emerging Utility';
+  }
+  return 'Other';
+}
+function classifyIntent(assetNames,info){
+  let consumer=0,dev=0;
+  assetNames.forEach(n=>{ if(CONSUMER_EXT.test(n)) consumer++; if(DEV_EXT.test(n)) dev++; });
+  const text=((info.description||'')+' '+(info.topics||[]).join(' ')).toLowerCase();
+  const userWords=/desktop|app|gui|windows|macos|android|launcher|utility|player|editor|manager|recorder|downloader|client|portable/;
+  const devWords=/library|sdk|framework|api|package|module|bindings|developer/;
+  let level='low';
+  if(consumer>=2 || (consumer>=1&&userWords.test(text))) level='high';
+  else if(consumer>=1 || (userWords.test(text)&&!devWords.test(text))) level='medium';
+  else if(dev>0||devWords.test(text)) level='low';
+  return {level,consumer,dev};
+}
+function measuredStats(r){
+  const b=BASELINE[keyOf(r.repo)];
+  if(!b||!b.downloads||!b.at||!r.downloads) return {monthly:0,growth:0,days:0};
+  const days=(Date.parse(r.scannedAt||new Date().toISOString())-Date.parse(b.at))/86400000;
+  if(!(days>=1)) return {monthly:0,growth:0,days:0};
+  const diff=Math.max(0,r.downloads-b.downloads), monthly=diff/days*30.44;
+  const growth=r.lifePerMonth?monthly/r.lifePerMonth:0;
+  return {monthly,growth,days};
+}
+function clamp(n,a,b){ return Math.max(a,Math.min(b,n)); }
+
+/* =====================================================================
+   V9 TUNABLE SCORING
+   Har component pehle 0..1 ka fraction banta hai, phir uspar aap ka
+   weight lagta hai aur total ko 100 par normalise kar diya jata hai.
+   Is liye score hamesha 0–100 rehta hai chahe sliders kuch bhi hon.
+   ===================================================================== */
+const WEIGHT_KEY='np_weights_v1';
+const WEIGHT_DEF={demand:25,growth:20,gap:20,intent:15,fresh:10,ratio:10,unmet:0};
+const WEIGHT_PRESETS={
+  'default':{demand:25,growth:20,gap:20,intent:15,fresh:10,ratio:10,unmet:0},
+  'seo':     {demand:30,growth:12,gap:34,intent:16,fresh:5, ratio:8, unmet:5},
+  'product': {demand:26,growth:16,gap:10,intent:30,fresh:8, ratio:16,unmet:14},
+  'rising':  {demand:14,growth:38,gap:18,intent:14,fresh:24,ratio:6, unmet:6}
+};
+const WEIGHT_LABEL={demand:'Demand',growth:'Growth',gap:'Gap',intent:'Intent',
+                    fresh:'Fresh',ratio:'DL/star',unmet:'Unmet'};
+let WEIGHTS={...WEIGHT_DEF};
+try{
+  const w=JSON.parse(localStorage.getItem(WEIGHT_KEY)||'null');
+  if(w) Object.keys(WEIGHT_DEF).forEach(k=>{ const v=Number(w[k]); if(isFinite(v)) WEIGHTS[k]=clamp(Math.round(v),0,40); });
+}catch(e){}
+function saveWeights(){ try{ localStorage.setItem(WEIGHT_KEY,JSON.stringify(WEIGHTS)); }catch(e){} }
+
+function applyOpportunityScore(r){
+  if(r.err){r.score=0;r.scoreParts={};r.scoreFrac={};return r;}
+  const f={};
+
+  // --- demand: abhi ka download rate ---
+  const demandBase=Math.max(r.perMonth||0,(r.latestDl||0)/3);
+  f.demand=clamp(Math.log10(demandBase+1)/5,0,1);
+
+  // --- growth: momentum + star velocity ---
+  const ms=measuredStats(r); r.measuredMonthly=ms.monthly;
+  const rateMom=r.lifePerMonth?((r.perMonth||0)/r.lifePerMonth):0;
+  // FIX (V8 bug): pichli release ke 2 downloads aur nayi ke 2000 = 1000x fake momentum.
+  // Ab release momentum tabhi ginta hai jab pichli release ka asli volume ho.
+  const relMom=((r.previousReleaseDl||0)>=100)?(r.releaseMomentum||0):0;
+  let mom=Math.max(ms.growth||0,rateMom||0,relMom||0);
+  if(!isFinite(mom)) mom=0;
+  mom=Math.min(mom,10);                       // upar se clamp, warna ek row poori table dabaa deti hai
+  r.momentum=mom;
+  const starBoost=clamp(Math.log10((r.starVelocity||0)+1)/3,0,1);
+  const growthBase=clamp((Math.log2(Math.max(.25,mom))+2)/5,0,1);
+  f.growth=clamp(growthBase*.78+starBoost*.22,0,1);
+
+  // --- website gap ---
+  const gapMap={none:1,docs:.8,readme:.45,dedicated:0,unknown:.25};
+  f.gap=gapMap[r.siteLevel]??.25;
+
+  // --- consumer intent ---
+  const intentMap={high:1,medium:.6,low:.13,unknown:.27};
+  f.intent=intentMap[r.consumerIntent]??.27;
+
+  // --- freshness: sirf release nahi, repo ki zindagi bhi ---
+  // (V8 mein saal bhar se release na karne wala active repo 1/10 par gir jata tha)
+  let relF=0;
+  if(r.lastRelease){ const d=r.relAgeDays; relF=d<=30?1:d<=90?.8:d<=180?.6:d<=365?.3:.1; }
+  let pushF=0;
+  if(r.pushedDays!=null&&isFinite(r.pushedDays)){
+    const d=r.pushedDays; pushF=d<=14?1:d<=45?.8:d<=120?.55:d<=365?.25:.05;
+  }
+  f.fresh=clamp(Math.max(relF,pushF*.75),0,1);
+
+  // --- downloads per star: users > developers ---
+  f.ratio=clamp(Math.log10((r.ratio||0)+1)/3,0,1);
+
+  // --- unmet demand: open issues nisbatan stars ke ---
+  f.unmet=clamp((r.issueRatio||0)/0.15,0,1);
+
+  const total=Object.values(WEIGHTS).reduce((a,b)=>a+b,0)||1;
+  let sum=0; const parts={};
+  Object.keys(WEIGHTS).forEach(k=>{ const v=(f[k]||0)*WEIGHTS[k]; parts[k]=Math.round(v/total*100); sum+=v; });
+  r.scoreFrac=f;
+  r.scoreParts=parts;
+  r.score=Math.round(sum/total*100);
+  return r;
+}
+
+let RESCORE_T=null;
+function rescore(){
+  RESULTS.forEach(applyOpportunityScore);
+  NICHE_CACHE=null;
+  renderTab();
+  if(RESCORE_T) clearTimeout(RESCORE_T);
+  RESCORE_T=setTimeout(autosave,600);     // slider drag par har frame localStorage na likhein
+}
+function paintWeights(){
+  document.querySelectorAll('#weights .wrow').forEach(row=>{
+    const k=row.dataset.w;
+    row.querySelector('input').value=WEIGHTS[k];
+    row.querySelector('label b').textContent=WEIGHTS[k];
+  });
+}
+$('#weights').addEventListener('input',e=>{
+  const row=e.target.closest('.wrow'); if(!row) return;
+  const k=row.dataset.w;
+  WEIGHTS[k]=clamp(Math.round(Number(e.target.value)||0),0,40);
+  if(Object.values(WEIGHTS).reduce((a,b)=>a+b,0)===0) WEIGHTS[k]=1;   // sab zero na hon
+  row.querySelector('label b').textContent=WEIGHTS[k];
+  saveWeights(); rescore();
+});
+document.querySelector('.presets').addEventListener('click',e=>{
+  const p=e.target.dataset.p; if(!p||!WEIGHT_PRESETS[p]) return;
+  WEIGHTS={...WEIGHT_PRESETS[p]};
+  paintWeights(); saveWeights(); rescore();
+});
+paintWeights();
+// V8 sirf "name + suffix" deta tha. V9 README headings, topics, niche leader
+// aur asli search-intent modifiers mila kar keywords banata hai.
+const KW_YEAR=new Date().getFullYear();
+function niceName(repo){ return String(repo||'').split('/').pop().replace(/[-_.]+/g,' ').trim(); }
+function keywordIdeas(r){
+  const name=niceName(r.repo);
+  const plat=(r.platform&&r.platform!=='Unknown')?r.platform.split(' + ')[0].toLowerCase():'windows';
+  const out=[
+    name,
+    `${name} download`,
+    `${name} alternative`,
+    `is ${name} safe`,
+    `how to install ${name}`,
+    `${name} for ${plat}`,
+    `${name} not working`,
+    `${name} vs`
+  ];
+  if(r.siteLevel==='none'||r.siteLevel==='docs') out.push(`${name} official site`,`${name} portable`);
+  (r.topics||[]).slice(0,4).forEach(t=>{
+    const T=String(t).replace(/[-_]+/g,' ');
+    if(!TOPIC_STOP.has(String(t).toLowerCase())) out.push(`best ${T} ${KW_YEAR}`,`free ${T} for ${plat}`);
+  });
+  (r.readmeHeads||[]).slice(0,6).forEach(h=>out.push(`${name} ${String(h).toLowerCase()}`));
+  // is repo ki niche ka leader — "X alternative" sab se zyada intent wala keyword hota hai
+  const n=niches().find(x=>x.repos.some(y=>y.repo===r.repo));
+  if(n && n.repos[0] && n.repos[0].repo!==r.repo) out.push(`${niceName(n.repos[0].repo)} alternative`);
+  return [...new Set(out.map(x=>x.trim()).filter(Boolean))].slice(0,22).join('\n');
+}
+
+/* =====================================================================
+   V9 NICHE ROLLUP  —  yehi asli maqsad hai
+   Ek repo "niche" nahi hoti. Niche wo hoti hai jahan:
+     • demand asli ho (downloads per month, sirf stars nahi)
+     • kisi ka website na ho (search results khali parhe hon)
+     • users consumer hon, developers nahi
+     • aur demand ek hi project ke qabze mein na ho (fragmentation)
+   Neeche har verified repo ko uske topics par group kiya jata hai.
+   ===================================================================== */
+function niches(){
+  if(!NICHE_CACHE) NICHE_CACHE=buildNiches();
+  return NICHE_CACHE;
+}
+function buildNiches(){
+  const rows=RESULTS.filter(r=>!r.err);
+  if(rows.length<2) return [];
+  const m=new Map();
+  const push=(k,r,fromCat)=>{
+    const key=String(k||'').toLowerCase().trim().replace(/\s+/g,'-');
+    if(!key||key.length<3||TOPIC_STOP.has(key)) return;
+    const n=m.get(key)||{niche:key,repos:[],fromCat:!!fromCat};
+    if(!fromCat) n.fromCat=false;
+    if(!n.repos.some(x=>x.repo===r.repo)) n.repos.push(r);
+    m.set(key,n);
+  };
+  const freq=new Map();   // har topic kitni dafa poori table mein aaya
+  rows.forEach(r=>(r.topics||[]).forEach(t=>{
+    const k=String(t||'').toLowerCase().trim().replace(/\s+/g,'-');
+    if(k) freq.set(k,(freq.get(k)||0)+1);
+  }));
+  rows.forEach(r=>{
+    (r.topics||[]).slice(0,8).forEach(t=>push(t,r,false));
+    if(r.category&&r.category!=='Other') push(r.category,r,true);
+  });
+
+  const out=[];
+  m.forEach(n=>{
+    if(n.repos.length<2) return;                        // ek repo se niche nahi banti
+    const reps=[...n.repos].sort((a,b)=>(b.downloads||0)-(a.downloads||0));
+    const mo=reps.reduce((s,r)=>s+(r.perMonth||0),0);
+    const tot=reps.reduce((s,r)=>s+(r.downloads||0),0);
+    const noSite=reps.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs').length;
+    const cons=reps.filter(r=>r.consumerIntent==='high'||r.consumerIntent==='medium').length;
+    const moms=reps.map(r=>r.momentum||0).sort((a,b)=>a-b);
+    const growth=moms[Math.floor(moms.length/2)]||0;    // median, taake ek outlier na uchhale
+    const conc=tot?(reps[0].downloads||0)/tot:1;        // leader ka hissa
+    const gapPct=noSite/reps.length*100;
+    const intentPct=cons/reps.length*100;
+    const unmet=reps.reduce((s,r)=>s+(r.issueRatio||0),0)/reps.length;
+    const stars=reps.reduce((s,r)=>s+(r.stars||0),0);
+
+    const f={
+      demand: clamp(Math.log10(mo+1)/5,0,1),
+      gap:    gapPct/100,
+      intent: intentPct/100,
+      growth: clamp((Math.log2(Math.max(.25,growth))+2)/5,0,1),
+      frag:   clamp(1-conc,0,1),
+      unmet:  clamp(unmet/0.15,0,1)
+    };
+    const score=Math.round(f.demand*30 + f.gap*22 + f.intent*18 + f.growth*14 + f.frag*10 + f.unmet*6);
+    out.push({niche:n.niche,aliases:[],fromCat:!!n.fromCat,sig:reps.map(r=>r.repo).sort().join('|'),
+              repos:reps,count:reps.length,mo,tot,stars,gapPct,intentPct,
+              growth,conc,unmet,score,parts:{
+                demand:Math.round(f.demand*30),gap:Math.round(f.gap*22),intent:Math.round(f.intent*18),
+                growth:Math.round(f.growth*14),frag:Math.round(f.frag*10),unmet:Math.round(f.unmet*6)}});
+  });
+  // Ek hi repo set kai naamon se aa sakta hai (screen-recorder / video-capture / Media Tool).
+  // Wo teen alag niches nahi — ek hi hai. Sab se representative naam rakh kar baqi ko alias bana dete hain.
+  const bySig=new Map();
+  out.forEach(n=>{ (bySig.get(n.sig)||bySig.set(n.sig,[]).get(n.sig)).push(n); });
+  const merged=[];
+  bySig.forEach(group=>{
+    group.sort((a,b)=>
+      (a.fromCat?1:0)-(b.fromCat?1:0)                       // asli topic pehle, category baad mein
+      || (freq.get(b.niche)||0)-(freq.get(a.niche)||0)      // jo topic zyada repos par laga ho
+      || a.niche.length-b.niche.length
+      || a.niche.localeCompare(b.niche));
+    const keep=group[0];
+    keep.aliases=group.slice(1).map(x=>x.niche);
+    merged.push(keep);
+  });
+  return merged.sort((a,b)=>b.score-a.score);
+}
+
+// har niche ke liye search-intent angles — ye seedha content plan ban jate hain
+function nicheAngles(n){
+  const t=n.niche.replace(/-+/g,' ');
+  const leader=niceName(n.repos[0].repo);
+  const plats=n.repos.map(r=>r.platform).filter(p=>p&&p!=='Unknown'&&p!=='Cross-platform');
+  const plat=(plats[0]||'windows').split(' + ')[0].toLowerCase();
+  const gapRepos=n.repos.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs').slice(0,2);
+  const out=[`best ${t} ${KW_YEAR}`,`${leader} alternative`,`free ${t} for ${plat}`];
+  gapRepos.forEach(g=>out.push(`${niceName(g.repo)} download`));
+  if(n.repos.length>=3) out.push(`${leader} vs ${niceName(n.repos[1].repo)}`);
+  if(n.unmet>0.08) out.push(`${t} not working fix`);
+  return [...new Set(out)].slice(0,6);
+}
+
+function renderNiches(){
+  const body=$('#nbody'); body.innerHTML='';
+  const list=[...niches()];
+  list.sort((a,b)=>{
+    let x=a[NSORT.k], y=b[NSORT.k];
+    if(NSORT.k==='niche'){ x=String(x).toLowerCase(); y=String(y).toLowerCase(); }
+    else { x=Number(x)||0; y=Number(y)||0; }
+    return (x<y?-1:x>y?1:0)*NSORT.dir;
+  });
+  const max=list.length?Math.max(1,...list.map(n=>n.score)):1;
+  list.forEach(n=>{
+    const p=n.parts;
+    const tip=`Demand ${p.demand}/30 · Site gap ${p.gap}/22 · Consumer ${p.intent}/18 · `
+             +`Growth ${p.growth}/14 · Fragmentation ${p.frag}/10 · Unmet ${p.unmet}/6`;
+    const cls=n.score>=62?'hot':n.score>=45?'good':'mid';
+    const gapRepos=n.repos.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs').slice(0,3);
+    const lead=n.repos[0];
+    const concTip=n.conc>=.85
+      ? 'Ek hi project poore niche ke downloads par qabza kiye hue hai — entry mushkil'
+      : 'Demand kai projects mein bati hui hai — naye entrant ke liye behtar';
+    const angles=nicheAngles(n);
+    const tr=document.createElement('tr');
+    if(n.gapPct>=60) tr.className='gap';
+    tr.innerHTML=`
+      <td class="num"><span class="score ${cls}" title="${esc(tip)}">${n.score}</span>
+        <div class="nbar"><i style="width:${Math.round(n.score/max*100)}%"></i></div></td>
+      <td><div class="nname">${esc(n.niche.replace(/-+/g,' '))}</div>
+        ${n.aliases.length?`<div class="nsub">also: ${esc(n.aliases.map(a=>a.replace(/-+/g,' ')).join(', '))}</div>`:''}
+        <div class="nsub">${esc(n.repos.slice(0,3).map(r=>r.repo.split('/').pop()).join(' · '))}</div></td>
+      <td class="num">${n.count}<div class="nsub">${fmt(n.stars)} ★</div></td>
+      <td class="num">${fmt(Math.round(n.mo))}<div class="nsub">${fmt(n.tot)} total</div></td>
+      <td class="num" style="color:${n.gapPct>=60?'var(--gold-soft)':'var(--muted)'}">${Math.round(n.gapPct)}%</td>
+      <td class="num">${Math.round(n.intentPct)}%</td>
+      <td class="num">${n.growth?(n.growth>=1?'↑ ':'↓ ')+n.growth.toFixed(1)+'×':'—'}</td>
+      <td class="num ${n.conc>=.85?'warn':''}"><span class="tip" title="${esc(concTip)}">${Math.round(n.conc*100)}%</span></td>
+      <td class="nlead"><a href="https://github.com/${esc(lead.repo)}" target="_blank" rel="noopener">${esc(lead.repo)}</a>
+        <div class="nsub">${gapRepos.length?'no site: '+esc(gapRepos.map(r=>r.repo.split('/').pop()).join(', ')):'sab ke paas site hai'}</div></td>
+      <td><div class="kwbox">${esc(angles.join('\n'))}</div>
+        <button class="ghost kwbtn" data-nkw="${esc(n.niche)}" style="margin:6px 0 0">COPY</button></td>`;
+    body.appendChild(tr);
+  });
+  $('#ntbl').classList.toggle('show',list.length>0);
+  $('#nempty').classList.toggle('show',list.length===0);
+  const strong=list.filter(n=>n.score>=55).length;
+  const open=list.filter(n=>n.gapPct>=60&&n.conc<0.85).length;
+  $('#tstat').innerHTML=`<b>${strong}</b> score 55+ · <b>${open}</b> wide open (no site + not a monopoly) · ${list.length} niches from ${RESULTS.filter(r=>!r.err).length} repos`;
+}
+
+// niche ke saare angles + gap repos copy
+$('#nbody').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-nkw]'); if(!b) return;
+  const n=niches().find(x=>x.niche===b.dataset.nkw); if(!n) return;
+  const text=[`# NICHE: ${n.niche.replace(/-+/g,' ')}  (score ${n.score})`,
+    (n.aliases&&n.aliases.length)?`# also known as: ${n.aliases.map(a=>a.replace(/-+/g,' ')).join(', ')}`:'',
+    `# ${n.count} repos · ${Math.round(n.mo).toLocaleString('en-US')} downloads/month · ${Math.round(n.gapPct)}% without a website`,
+    '', '## Search angles', ...nicheAngles(n),
+    '', '## Repos', ...n.repos.map(r=>`${r.repo}  —  ${r.siteLevel.toUpperCase()}  ${Math.round(r.perMonth).toLocaleString('en-US')}/mo  score ${r.score}`)
+  ].join('\n');
+  try{ await navigator.clipboard.writeText(text); b.textContent='COPIED'; setTimeout(()=>b.textContent='COPY',1400); }
+  catch(err){ prompt('Copy niche brief:',text); }
+});
+
+// niche table ke headers se sort
+document.querySelectorAll('#ntbl thead th[data-nk]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.dataset.nk;
+    if(NSORT.k===k) NSORT.dir*=-1; else { NSORT.k=k; NSORT.dir=(k==='niche')?1:-1; }
+    renderNiches();
+  });
+});
+
+// ---- tabs ----
+function renderTab(){
+  const isN=(TAB==='niches');
+  $('#rwrap').style.display=isN?'none':'';
+  $('#nwrap').style.display=isN?'':'none';
+  $('#filter').style.display=isN?'none':'';
+  $('#colbtn').parentElement.style.display=isN?'none':'';
+  $('#empty').classList.toggle('show',!isN&&RESULTS.length===0);
+  if(isN){ $('#empty').classList.remove('show'); renderNiches(); }
+  else{ $('#nempty').classList.remove('show'); render(); }
+}
+$('#tabs').addEventListener('click',e=>{
+  const t=e.target.dataset.t; if(!t) return;
+  TAB=t;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===e.target));
+  renderTab();
+});
+
+// ek repo ka poora verification — ab ye alag function hai taake kai saath chal sakein
+async function scanOne(repo,token,NOW,maxRelPages){
+  const info=await ghGet(`https://api.github.com/repos/${repo}`,token);
+  const stars=info.stargazers_count||0;
+  const readme=await readmeText(repo,token);
+  const web=webPresence(info.homepage,readme);
+  const readmeHeads=readmeHeadings(readme);
+  const {total:dls,firstDate,latest,previous,assetNames,releaseCount,truncated}=await scanReleases(repo,token,maxRelPages);
+  const intent=classifyIntent(assetNames,info);
+  const platform=detectPlatform(info,assetNames);
+  const category=detectCategory(info);
+  const MO=1000*60*60*24*30.44, DAY=86400000;
+  const repoAgeMonths=info.created_at?Math.max(1,(Date.now()-Date.parse(info.created_at))/MO):0;
+  const starVelocity=repoAgeMonths?stars/repoAgeMonths:0;
+  const releaseMomentum=(latest&&previous&&previous.downloads>0)?latest.downloads/previous.downloads:0;
+  const pushedDays=info.pushed_at?(Date.now()-Date.parse(info.pushed_at))/DAY:null;
+  const openIssues=info.open_issues_count||0;
+  const issueRatio=stars?openIssues/stars:0;
+  // lifetime average — everything ever, spread over the whole release history
+  let lifeMonths=1;
+  if(firstDate) lifeMonths=Math.max(1,(Date.now()-firstDate.getTime())/MO);
+  const lifePerMonth=dls/lifeMonths;
+  // current rate — latest release only, over just the days it has been out
+  let perMonth=0, ageDays=0, fresh=false;
+  if(latest){
+    ageDays=Math.max(0,(Date.now()-latest.date.getTime())/DAY);
+    fresh=ageDays<10;
+    // 7-day floor: a release that shipped hours ago would divide into nonsense
+    perMonth=latest.downloads/Math.max(ageDays,7)*30.44;
+  }
+  const row={repo,stars,forks:info.forks_count||0,starVelocity,repoAgeMonths,downloads:dls,ratio:stars?dls/stars:0,perMonth,lifePerMonth,
+    relAgeDays:ageDays, fresh, latestDl:latest?latest.downloads:0, latestTag:latest?latest.tag:'',
+    latestPre:latest?latest.pre:false, latestUrl:latest?latest.url:'', latestAssets:latest?latest.assets:0,
+    previousReleaseDl:previous?previous.downloads:0, releaseMomentum,
+    lastRelease:latest?latest.date.getTime():0, description:info.description||'',topics:info.topics||[],language:info.language||'',
+    releaseCount,releasesTruncated:!!truncated,platform,category,consumerIntent:intent.level,
+    consumerAssets:intent.consumer,devAssets:intent.dev,
+    pushedDays,openIssues,issueRatio,readmeHeads,
+    siteLevel:web.level,siteUrl:web.url,site:(web.level==='none'||web.level==='docs')?'NO':'yes',
+    err:false,scannedAt:NOW};
+  return applyOpportunityScore(row);
+}
+function errRow(repo,NOW){
+  return {repo,stars:0,downloads:0,ratio:0,perMonth:0,lifePerMonth:0,relAgeDays:0,
+    fresh:false,latestDl:0,latestTag:'',latestPre:false,latestUrl:'',latestAssets:0,lastRelease:0,
+    platform:'Unknown',category:'Other',consumerIntent:'unknown',siteLevel:'unknown',site:'—',
+    momentum:0,pushedDays:null,openIssues:0,issueRatio:0,readmeHeads:[],
+    score:0,err:true,scannedAt:NOW};
+}
+
+// halka sa render throttle — 300 rows par har repo ke baad poora DOM banana bhaari hai
+let RENDER_T=null;
+function scheduleRender(){
+  if(RENDER_T) return;
+  RENDER_T=setTimeout(()=>{ RENDER_T=null; NICHE_CACHE=null; renderTab(); },220);
+}
+
+async function runVerify(){
+  const token=tokEl.value.trim();
+  if(!token){ alert('Token daalein (step 1).'); return; }
+  if(rememberEl.checked){ try{localStorage.setItem('np_token',token)}catch(e){} }
+
+  const repos=parseRepos(pasteEl.value);
+  if(!repos.length){ alert('Koi repo nahi mila. CSV upload karein ya paste karein.'); return; }
+
+  const btn=$('#scan'); btn.disabled=true;
+  $('#status').classList.add('show');
+
+  // purani scan ko baseline bana lein — naye numbers ke sath farq nazar aayega
+  if(RESULTS.length){
+    const b={};
+    RESULTS.forEach(r=>{ if(!r.err && r.downloads) b[keyOf(r.repo)]={downloads:r.downloads,at:r.scannedAt||''}; });
+    if(Object.keys(b).length) BASELINE=b;
+  }
+
+  RESULTS=[];
+  const NOW=new Date().toISOString();
+  const fill=$('#barfill');
+  const CONC=clamp(Number($('#concur').value)||3,1,6);
+  const MAXREL=clamp(Number($('#maxrelpages').value)||3,1,10);
+  const slots=new Array(repos.length);
+  let cursor=0, done=0, aborted=false, t0=Date.now();
+
+  async function worker(){
+    while(!aborted){
+      const i=cursor++;
+      if(i>=repos.length) return;
+      const repo=repos[i];
+      try{
+        slots[i]=await scanOne(repo,token,NOW,MAXREL);
+      }catch(e){
+        if(e&&e.fatal){ aborted=true; alert(e.msg); return; }
+        slots[i]=errRow(repo,NOW);
+      }
+      done++;
+      const per=(Date.now()-t0)/done, left=Math.round(per*(repos.length-done)/1000);
+      $('#statustxt').textContent=`Scanning ${done}/${repos.length} · ${repo}`
+        +(left>2&&done>3?` · ~${left>90?Math.round(left/60)+'m':left+'s'} left`:'');
+      fill.style.width=(done/repos.length*100)+'%';
+      RESULTS=slots.filter(Boolean);
+      scheduleRender();
+    }
+  }
+  await Promise.all(Array.from({length:CONC},()=>worker()));
+
+  RESULTS=slots.filter(Boolean);
+  if(RENDER_T){ clearTimeout(RENDER_T); RENDER_T=null; }
+  NICHE_CACHE=null;
+  fill.style.width='100%';
+  const ok=RESULTS.filter(r=>!r.err).length;
+  $('#statustxt').textContent=`Done · ${RESULTS.length} scanned · ${ok} ok`
+    +(CACHE_HITS?` · ${CACHE_HITS} served from cache`:'');
+  btn.disabled=false;
+  $('#toolbar').classList.add('show');
+  addSeen(RESULTS.map(r=>r.repo));        // agli discovery inhe skip kar degi
+  renderTab();
+  autosave();   // agli baar khud wapas aa jayega
+  refreshCacheStat();
+  showBanner('Saved in this browser · '+new Date().toISOString().slice(0,10)
+            +' — agli baar khud load ho jayega. "Save scan (.json)" se file bhi rakh lein.');
+}
+$('#scan').addEventListener('click',runVerify);
+
+// ---- render ----
+function fmt(n){ return n.toLocaleString('en-US'); }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// latest release: date + relative age + tag name
+function fmtRelease(r){
+  if(!r.lastRelease) return '<span style="color:var(--dim)">no releases</span>';
+  const ts=r.lastRelease, d=new Date(ts);
+  const iso=d.toISOString().slice(0,10);
+  const mo=(Date.now()-ts)/(1000*60*60*24*30.44);
+  let rel, col='var(--muted)';
+  if(mo<1){ rel='this month'; col='var(--ok)'; }
+  else if(mo<12){ rel=Math.round(mo)+' mo ago'; if(mo>18)col='var(--dim)'; }
+  else { rel=(mo/12).toFixed(1)+' yr ago'; col='var(--dim)'; }
+  let tag='';
+  if(r.latestTag){
+    const label=esc(r.latestTag)+(r.latestPre?'<span class="pre">PRE</span>':'');
+    tag=r.latestUrl
+      ? `<div class="reltag"><a href="${esc(r.latestUrl)}" target="_blank" rel="noopener" title="${esc(r.latestTag)}">${label}</a></div>`
+      : `<div class="reltag">${label}</div>`;
+  }
+  return `<div class="relline">${iso} <span style="color:${col};font-size:11px">(${rel})</span></div>${tag}`;
+}
+
+// current download rate, with the lifetime average kept in the tooltip
+function fmtRate(r){
+  if(!r.lastRelease) return '<span style="color:var(--dim)">—</span>';
+  if(!r.perMonth) return '0';
+  const n=fmt(Math.round(r.perMonth));
+  const days=Math.max(1,Math.round(r.relAgeDays));
+  const d=days===1?'1 day':days+' days';
+  let tip=`${fmt(r.latestDl)} downloads in ${d} since the latest release`
+        + ` · lifetime average ${fmt(Math.round(r.lifePerMonth))}/mo`;
+  if(r.fresh){
+    tip+=` · only ${d} of data, launch-day spike inflates this`;
+    return `<span class="prov" title="${esc(tip)}">~${n}</span>`;
+  }
+  if(r.lifePerMonth>0){
+    const m=r.perMonth/r.lifePerMonth;
+    if(m>=1.5) tip+=' · running above its lifetime average';
+    else if(m<=0.5) tip+=' · running below its lifetime average';
+  }
+  return `<span class="tip" title="${esc(tip)}">${n}</span>`;
+}
+
+// share of total downloads that the latest release accounts for
+function fmtLatestDl(r){
+  if(!r.lastRelease) return '<span style="color:var(--dim)">—</span>';
+  if(!r.latestDl) return r.latestAssets?'0':'<span style="color:var(--dim)">no files</span>';
+  const pct=r.downloads?Math.round(r.latestDl/r.downloads*100):0;
+  return `${fmt(r.latestDl)}<span class="share">${pct}%</span>`;
+}
+// total downloads + pichli saved scan se farq (README wala 30-din wala tareeqa, khud-ba-khud)
+function fmtTotal(r){
+  const n=fmt(r.downloads);
+  const b=BASELINE[keyOf(r.repo)];
+  if(r.err || !b || !b.downloads || b.downloads===r.downloads) return n;
+  const diff=r.downloads-b.downloads, up=diff>0;
+  const when=b.at?String(b.at).slice(0,10):'';
+  let tip=(up?'+':'−')+fmt(Math.abs(diff))+' downloads since'+(when?' '+when:' the last saved scan');
+  if(b.at){
+    const days=Math.round((Date.now()-Date.parse(b.at))/86400000);
+    if(days>=1) tip+=' · '+days+' day'+(days===1?'':'s')+' → '+fmt(Math.round(Math.abs(diff)/days*30.44))+'/mo measured';
+  }
+  return n+'<span class="delta '+(up?'up':'down')+'" title="'+esc(tip)+'">'
+        +(up?'+':'−')+fmt(Math.abs(diff))+'</span>';
+}
+
+function meterWidth(r){ return Math.min(100, Math.log10(r+1)*25); } // 10→25%,100→50%,1k→75%,10k→100%
+
+function render(){
+  const body=$('#body'); body.innerHTML='';
+  let rows=[...RESULTS];
+  if(FILTER==='gaps') rows=rows.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs');
+  if(FILTER==='consumer') rows=rows.filter(r=>r.consumerIntent==='high'||r.consumerIntent==='medium');
+  if(FILTER==='hot') rows=rows.filter(r=>r.score>=70);
+  if(FILTER==='trending') rows=rows.filter(r=>r.momentum>=1.5 || r.measuredMonthly>=10000);
+  rows.sort((a,b)=>{
+    let x=a[SORT.k],y=b[SORT.k];
+    // error rows ke pas kai fields hote hi nahi — undefined sort ko torh deta tha
+    const str=(typeof x==='string')||(typeof y==='string');
+    if(str){ x=String(x||'').toLowerCase(); y=String(y||'').toLowerCase(); }
+    else { x=Number(x)||0; y=Number(y)||0; }
+    return (x<y?-1:x>y?1:0)*SORT.dir;
+  });
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    if(r.siteLevel==='none'||r.siteLevel==='docs') tr.className='gap';
+    const sp=r.scoreParts||{};
+    const wsum=Object.values(WEIGHTS).reduce((a,b)=>a+b,0)||1;
+    const scoreTip=Object.keys(WEIGHTS).filter(k=>WEIGHTS[k]>0)
+      .map(k=>`${WEIGHT_LABEL[k]} ${sp[k]||0}/${Math.round(WEIGHTS[k]/wsum*100)}`).join(' · ');
+    const scoreClass=r.score>=80?'hot':r.score>=65?'good':'mid';
+    const siteLabels={none:'◆ NONE',docs:'◆ DOCS',readme:'README link',dedicated:'DEDICATED',unknown:'—'};
+    const siteCell=r.err?'<span class="tag err">error</span>':`<span class="site-${esc(r.siteLevel)} tip" title="${esc(r.siteUrl||'No external site detected')}">${siteLabels[r.siteLevel]||'—'}</span>`;
+    const mom=r.momentum?((r.momentum>=1?'↑ ':'↓ ')+r.momentum.toFixed(1)+'×'):'—';
+    const momTip=(r.releaseMomentum?`Latest vs previous release ${r.releaseMomentum.toFixed(2)}× · `:'')+(r.measuredMonthly?`${fmt(Math.round(r.measuredMonthly))}/mo measured from saved baseline`:'current release rate vs lifetime + star velocity');
+    const intentTitle=`${r.consumerAssets||0} consumer-style assets · ${r.devAssets||0} developer-style assets`;
+    tr.innerHTML=`
+      <td class="num"><span class="score ${scoreClass}" title="${esc(scoreTip)}">${r.score||0}</span></td>
+      <td class="repo"><a href="https://github.com/${r.repo}" target="_blank" rel="noopener">${r.repo}</a><button class="ghost kwbtn" data-kw="${esc(r.repo)}" title="Copy search-intent ideas">KW</button><div class="subcell">${esc((r.description||'').slice(0,70))}</div></td>
+      <td>${esc(r.category||'Other')}</td>
+      <td>${esc(r.platform||'Unknown')}</td>
+      <td><span class="intent-${esc(r.consumerIntent)} tip" title="${esc(intentTitle)}">${esc((r.consumerIntent||'unknown').toUpperCase())}</span></td>
+      <td class="num tip" title="${esc((r.starVelocity||0).toFixed(1)+'/mo star velocity · repo age '+(r.repoAgeMonths||0).toFixed(1)+' months'
+          +(r.openIssues?' · '+r.openIssues+' open issues ('+(r.issueRatio*100).toFixed(1)+'% of stars) = unmet demand':'')
+          +(r.pushedDays!=null?' · last push '+Math.round(r.pushedDays)+'d ago':''))}">${fmt(r.stars)}<div class="subcell">${r.starVelocity?fmt(Math.round(r.starVelocity))+'/mo':''}</div></td>
+      <td class="num">${fmtTotal(r)}</td>
+      <td class="num">${fmtLatestDl(r)}</td>
+      <td class="num"><div class="meter"><span class="track"><i style="width:${meterWidth(r.ratio)}%"></i></span><span class="val">${r.ratio?r.ratio.toFixed(1):'0'}</span></div></td>
+      <td class="num">${fmtRate(r)}</td>
+      <td class="num tip" title="${esc(momTip)}">${mom}</td>
+      <td style="font-family:var(--mono);font-size:12px">${fmtRelease(r)}</td>
+      <td>${siteCell}</td>
+      <td class="sp"></td>`;
+    body.appendChild(tr);
+  });
+  $('#tbl').classList.toggle('show',RESULTS.length>0);
+  $('#empty').classList.toggle('show',RESULTS.length===0);
+  const gaps=RESULTS.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs').length;
+  const hot=RESULTS.filter(r=>r.score>=70).length;
+  const nn=niches().length;
+  $('#tstat').innerHTML=`<b>${hot}</b> score 70+ · <b>${gaps}</b> web gaps · ${RESULTS.length} scanned`
+    +(nn?` · <b>${nn}</b> niches found →`:'');
+}
+
+// copy generated keyword ideas from any result row
+$('#body').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-kw]'); if(!b)return;
+  const r=RESULTS.find(x=>x.repo===b.dataset.kw); if(!r)return;
+  const text=keywordIdeas(r);
+  try{await navigator.clipboard.writeText(text); b.textContent='COPIED'; setTimeout(()=>b.textContent='KW',1200);}
+  catch(err){prompt('Copy keyword ideas:',text);}
+});
+
+// sort by header
+document.querySelectorAll('#tbl thead th[data-k]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const k=th.dataset.k;
+    if(SORT.k===k) SORT.dir*=-1; else {SORT.k=k; SORT.dir=(['repo','siteLevel','platform','category','consumerIntent'].includes(k))?1:-1;}
+    render();
+  });
+});
+// filter segments
+$('#filter').addEventListener('click',e=>{
+  if(e.target.dataset.f){
+    FILTER=e.target.dataset.f;
+    document.querySelectorAll('#filter button').forEach(b=>b.classList.toggle('on',b===e.target));
+    render();
+  }
+});
+// export
+$('#export').addEventListener('click',()=>{
+  if(!RESULTS.length) return;
+  const q=v=>{ v=String(v??''); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const head='opportunity_score,repo,category,platform,consumer_intent,consumer_assets,stars,stars_per_month,total_downloads,latest_release_downloads,latest_release_tag,'
+    +'latest_release_date,latest_release_age_days,latest_is_prerelease,previous_release_downloads,release_momentum,downloads_per_star,current_downloads_per_month,lifetime_downloads_per_month,momentum,'
+    +'web_presence,site_url,open_issues,issue_ratio,days_since_push,topics,scanned_at,downloads_since_baseline,baseline_date\n';
+  const rows=RESULTS.map(r=>{
+    const b=BASELINE[keyOf(r.repo)];
+    return [
+      r.score, r.repo, r.category, r.platform, r.consumerIntent, r.consumerAssets, r.stars, Math.round(r.starVelocity||0), r.downloads, r.latestDl, r.latestTag,
+      r.lastRelease?new Date(r.lastRelease).toISOString().slice(0,10):'',
+      r.lastRelease?Math.round(r.relAgeDays):'',
+      r.latestPre?'yes':'no', r.previousReleaseDl||0, r.releaseMomentum?r.releaseMomentum.toFixed(2):'',
+      r.ratio.toFixed(2), Math.round(r.perMonth), Math.round(r.lifePerMonth), r.momentum?r.momentum.toFixed(2):'',
+      r.siteLevel, r.siteUrl,
+      r.openIssues||0, (r.issueRatio||0).toFixed(3), r.pushedDays!=null?Math.round(r.pushedDays):'',
+      (r.topics||[]).join(' '),
+      r.scannedAt?String(r.scannedAt).slice(0,10):'',
+      (b&&b.downloads)?(r.downloads-b.downloads):'',
+      (b&&b.at)?String(b.at).slice(0,10):''
+    ].map(q).join(',');
+  }).join('\n');
+  download(head+rows,'niche-scan-'+new Date().toISOString().slice(0,10)+'.csv','text/csv');
+});
+
+// ---- V9: niches CSV ----
+$('#exportniches').addEventListener('click',()=>{
+  const list=niches();
+  if(!list.length){ alert('Abhi koi niche nahi bani. Pehle kuch repos verify karein (kam az kam 2 repos ek topic share karein).'); return; }
+  const q=v=>{ v=String(v??''); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  const head='niche_score,niche,also_known_as,repos,total_stars,downloads_per_month,total_downloads,no_site_pct,'
+    +'consumer_pct,growth_median,leader_share_pct,unmet_ratio,leader,gap_repos,all_repos,search_angles\n';
+  const rows=list.map(n=>[
+    n.score, n.niche.replace(/-+/g,' '), (n.aliases||[]).join(' | '), n.count, n.stars, Math.round(n.mo), n.tot,
+    Math.round(n.gapPct), Math.round(n.intentPct), n.growth.toFixed(2), Math.round(n.conc*100),
+    n.unmet.toFixed(3), n.repos[0].repo,
+    n.repos.filter(r=>r.siteLevel==='none'||r.siteLevel==='docs').map(r=>r.repo).join(' | '),
+    n.repos.map(r=>r.repo).join(' | '),
+    nicheAngles(n).join(' | ')
+  ].map(q).join(',')).join('\n');
+  download(head+rows,'niches-'+new Date().toISOString().slice(0,10)+'.csv','text/csv');
+});
+
+// ---- kaun sa column dikhe / chupe + har column ki width (browser mein yaad rehti hai) ----
+const COLS_KEY='np_cols_v1', COLW_KEY='np_colw_v1';
+// default widths (px) — inhi ka total table ki min-width banta hai
+const COL_DEF_W={score:72,repo:190,category:86,platform:92,consumerIntent:80,stars:88,downloads:100,
+                 latestDl:96,ratio:108,perMonth:92,momentum:86,lastRelease:122,siteLevel:100};
+const COL_MIN=56, COL_MAX=640;
+const COMPACT_COLS=['score','repo','platform','consumerIntent','stars','downloads','perMonth','siteLevel'];
+const COLS=[...document.querySelectorAll('#tbl thead th[data-k]')].map((th,i)=>({
+  k:th.dataset.k, label:th.textContent.trim(), idx:i+1, th
+}));
+const colStyle=document.createElement('style'); document.head.appendChild(colStyle);
+
+let HIDDEN=new Set(), COLW={...COL_DEF_W};
+try{
+  const s=JSON.parse(localStorage.getItem(COLS_KEY)||'[]');
+  if(Array.isArray(s)) HIDDEN=new Set(s.filter(k=>COLS.some(c=>c.k===k)));
+}catch(e){}
+try{
+  const w=JSON.parse(localStorage.getItem(COLW_KEY)||'{}');
+  COLS.forEach(c=>{
+    const v=Number(w[c.k]);
+    if(Number.isFinite(v)) COLW[c.k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.round(v)));
+  });
+}catch(e){}
+if(HIDDEN.size>=COLS.length) HIDDEN.clear();   // sab columns kabhi hide na hon
+
+function saveCols(){
+  try{
+    localStorage.setItem(COLS_KEY,JSON.stringify([...HIDDEN]));
+    localStorage.setItem(COLW_KEY,JSON.stringify(COLW));
+  }catch(e){}
+}
+
+function applyCols(persist=true){
+  const rules=[]; let total=0;
+  COLS.forEach(c=>{
+    const sel=`#tbl th:nth-child(${c.idx}),#tbl td:nth-child(${c.idx})`;
+    if(HIDDEN.has(c.k)) rules.push(sel+'{display:none}');
+    else{ rules.push(sel+`{width:${COLW[c.k]}px}`); total+=COLW[c.k]; }
+  });
+  colStyle.textContent=rules.join('\n');
+  // bachi hui jagah aakhri spacer column kha jata hai, is liye drag exact rehta hai
+  $('#tbl').style.minWidth=total+'px';
+  $('#colcount').textContent=(COLS.length-HIDDEN.size)+'/'+COLS.length;
+  document.querySelectorAll('#collist .colitem').forEach(el=>{
+    const on=!HIDDEN.has(el.dataset.k);
+    el.classList.toggle('off',!on);
+    el.querySelector('input').checked=on;
+  });
+  if(persist) saveCols();
+}
+
+$('#collist').innerHTML=COLS.map(c=>
+  `<label class="colitem" data-k="${esc(c.k)}"><input type="checkbox"><span>${esc(c.label)}</span></label>`
+).join('');
+
+// checkbox toggle — kam az kam ek column hamesha visible rehta hai
+$('#collist').addEventListener('change',e=>{
+  const lab=e.target.closest('.colitem'); if(!lab) return;
+  const k=lab.dataset.k;
+  if(HIDDEN.has(k)) HIDDEN.delete(k);
+  else{
+    if(COLS.length-HIDDEN.size<=1){ e.target.checked=true; return; }
+    HIDDEN.add(k);
+  }
+  applyCols();
+});
+
+// All / Compact / Reset widths
+$('#colmenu').addEventListener('click',e=>{
+  e.stopPropagation();
+  const p=e.target.dataset.preset; if(!p) return;
+  if(p==='widths') COLW={...COL_DEF_W};
+  else HIDDEN = p==='compact' ? new Set(COLS.filter(c=>!COMPACT_COLS.includes(c.k)).map(c=>c.k)) : new Set();
+  applyCols();
+});
+
+// ---- header ke kinare ko drag kar ke column width badlein ----
+let RZ=null;
+COLS.forEach(c=>{
+  const g=document.createElement('span');
+  g.className='rsz'; g.dataset.k=c.k;
+  g.title='Drag to resize · double-click to reset';
+  g.addEventListener('click',e=>e.stopPropagation());   // resize se sort trigger na ho
+  g.addEventListener('dblclick',e=>{
+    e.stopPropagation(); e.preventDefault();
+    COLW[c.k]=COL_DEF_W[c.k]; applyCols();
+  });
+  g.addEventListener('pointerdown',e=>{
+    if(e.button) return;
+    e.preventDefault(); e.stopPropagation();
+    RZ={k:c.k, x:e.clientX, w:COLW[c.k], g};
+    g.classList.add('on');
+    document.body.classList.add('resizing');
+    try{ g.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  c.th.appendChild(g);
+});
+document.addEventListener('pointermove',e=>{
+  if(!RZ) return;
+  COLW[RZ.k]=Math.max(COL_MIN,Math.min(COL_MAX,Math.round(RZ.w + (e.clientX - RZ.x))));
+  applyCols(false);          // drag ke doran har frame par localStorage nahi likhte
+});
+function endResize(){
+  if(!RZ) return;
+  RZ.g.classList.remove('on');
+  RZ=null;
+  document.body.classList.remove('resizing');
+  saveCols();
+}
+document.addEventListener('pointerup',endResize);
+document.addEventListener('pointercancel',endResize);
+
+// menu open / close
+function closeCols(){
+  $('#colmenu').classList.remove('show');
+  $('#colbtn').classList.remove('open');
+  $('#colbtn').setAttribute('aria-expanded','false');
+}
+$('#colbtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  const open=$('#colmenu').classList.toggle('show');
+  $('#colbtn').classList.toggle('open',open);
+  $('#colbtn').setAttribute('aria-expanded',open?'true':'false');
+});
+document.addEventListener('click',closeCols);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ endResize(); closeCols(); } });
+
+applyCols();
+renderTab();
+initAutoMode();
+
+// ---- page khulte hi pichla scan wapas ----
+(function restoreSession(){
+  let raw=null;
+  try{ raw=localStorage.getItem(SESSION_KEY) || localStorage.getItem('np_session_v1'); }catch(e){ return; }
+  if(!raw) return;
+  let s; try{ s=JSON.parse(raw); }catch(e){ return; }
+  const rows=(s&&s.results)||[];
+  if(!rows.length) return;
+  const n=loadResults(rows,{baseline:s.baseline||{}});
+  if(!n) return;
+  showBanner('Restored '+n+' repos from your last scan'+(s.savedAt?' · '+s.savedAt.slice(0,10):'')
+            +' — scratch se shuru karne ki zaroorat nahi.');
+})();
+
+
+// ---- unfinished discovery bhi refresh ke baad exact checkpoint se resume ----
+(function restoreDiscovery(){
+  let d=null;
+  try{ const raw=localStorage.getItem(DISCOVERY_STATE_KEY); if(raw) d=JSON.parse(raw); }catch(e){}
+  if(!d || d.finished || !d.config) return;
+  const c=d.config;
+  seedsEl.value=(c.seeds||[]).join('\n');
+  if(c.minStars!=null) $('#minstars').value=c.minStars;
+  if(c.days!=null) $('#updateddays').value=c.days;
+  if(c.perSeed!=null) $('#perseed').value=c.perSeed;
+  if(c.expandN!=null) $('#expandtopics').value=c.expandN;
+  if(c.risingDays!=null) $('#risingdays').value=c.risingDays;
+  if(c.maxDiscover!=null) $('#maxdiscover').value=c.maxDiscover;
+  if(c.bias!=null) $('#consumerwords').checked=!!c.bias;
+  if(c.topicExpand!=null) $('#topicexpand').checked=!!c.topicExpand;
+  if(c.rising!=null) $('#risingmode').checked=!!c.rising;
+  if(c.gapMode!=null) $('#gapmode').checked=!!c.gapMode;
+  if(c.pages!=null) $('#pagesper').value=c.pages;
+  if(c.banding!=null) $('#starbands').checked=!!c.banding;
+  if(c.readmeSearch!=null) $('#readmesearch').checked=!!c.readmeSearch;
+  if(c.skipSeen!=null) $('#skipseen').checked=!!c.skipSeen;
+  estimateBudget();
+  // adhoori run ke candidates bhi wapas box mein — inhe abhi verify kiya ja sakta hai
+  const saved=(d.candidates||[]).slice().sort((a,b)=>b.rank-a.rank);
+  if(saved.length){
+    pasteEl.value=saved.slice(0,c.maxDiscover||300).map(x=>x.repo).join('\n');
+    filecount.textContent=`${Math.min(saved.length,c.maxDiscover||300)} candidates recovered from the saved checkpoint`;
+    $('#toolbar').classList.contains('show');
+  }
+  $('#discoverstatus').classList.add('show');
+  $('#discoverstatustxt').textContent=saved.length
+    ? `Unfinished discovery · ${saved.length} candidates already recovered below · resuming…`
+    : 'Unfinished discovery found · preparing exact resume…';
+  if(tokEl.value.trim()) setTimeout(()=>discoverRepos(),350);
+  else showBanner('Unfinished discovery is saved. Add your GitHub token, then press Discover to resume exactly where it stopped.');
+})();
+</script>
+</body>
+</html>
