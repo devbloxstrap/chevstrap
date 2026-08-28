@@ -1366,6 +1366,36 @@ $('#cachehours').addEventListener('input',e=>{
 });
 refreshCacheStat();
 
+// 403/429 par GitHub batata hai kab tak intezar karna hai — is se "search API limit
+// khatam ho gaya, agli query skip" wala masla nahi hota; wahi request thodi der baad
+// bilkul dobara try hoti hai, koi query/topic chhoot ta nahi.
+async function waitForApiReset(res,url){
+  const isSearch=url.includes('/search/');
+  const now=Date.now();
+  let waitMs=null;
+  const retryAfter=Number(res.headers.get('retry-after'));
+  if(isFinite(retryAfter)&&retryAfter>0) waitMs=retryAfter*1000;
+  if(waitMs==null){
+    const reset=Number(res.headers.get('x-ratelimit-reset'));
+    if(isFinite(reset)&&reset>0) waitMs=Math.max(0,reset*1000-now);
+  }
+  // header na mile to andaza: search window ~1 min, core window ~1 hr
+  if(waitMs==null) waitMs=isSearch?60000:3600000;
+  waitMs=Math.min(waitMs,3900000)+1500;   // safety cap ~65 min, thora buffer
+  const untilTs=now+waitMs;
+  const statusEl=isSearch?$('#discoverstatustxt'):$('#statustxt');
+  const label=isSearch?'Search API':'API';
+  saveDiscoveryState({waitingUntil:untilTs,waitingUrl:url});
+  let remaining=Math.ceil(waitMs/1000);
+  while(remaining>0){
+    const mm=Math.floor(remaining/60), ss=remaining%60;
+    if(statusEl) statusEl.textContent=`${label} rate limit hit · resuming in ${mm?mm+'m ':''}${ss}s…`;
+    await sleep(Math.min(1000,remaining*1000));
+    remaining=Math.max(0,Math.ceil((untilTs-Date.now())/1000));
+  }
+  saveDiscoveryState({waitingUntil:null,waitingUrl:null});
+}
+
 async function ghGet(url,token,quiet){
   const isSearch=url.includes('/search/');
   const cached=await CACHE.get(url);
